@@ -23,9 +23,21 @@ static int __Pyx__ArgTypeTest(PyObject *obj, PyTypeObject *type, const char *nam
     else {
         if (likely(__Pyx_TypeCheck(obj, type))) return 1;
     }
+#if CYTHON_COMPILING_IN_LIMITED_API
+    {
+        PyObject *type_name = __Pyx_PyType_GetName(type);
+        PyObject *obj_type_name = __Pyx_PyType_GetName(Py_TYPE(obj));
+        PyErr_Format(PyExc_TypeError,
+            "Argument '%.200s' has incorrect type (expected %V, got %V)",
+            name, type_name, "?", obj_type_name, "?");
+        Py_XDECREF(type_name);
+        Py_XDECREF(obj_type_name);
+    }
+#else
     PyErr_Format(PyExc_TypeError,
         "Argument '%.200s' has incorrect type (expected %.200s, got %.200s)",
         name, type->tp_name, Py_TYPE(obj)->tp_name);
+#endif
     return 0;
 }
 
@@ -111,7 +123,14 @@ static void __Pyx_RaiseMappingExpectedError(PyObject* arg); /*proto*/
 //////////////////// RaiseMappingExpected ////////////////////
 
 static void __Pyx_RaiseMappingExpectedError(PyObject* arg) {
+#if CYTHON_COMPILING_IN_LIMITED_API
+    PyObject *arg_type_name = __Pyx_PyType_GetName(Py_TYPE(arg));
+    PyErr_Format(PyExc_TypeError, "'%V' object is not a mapping",
+                 arg_type_name, "?");
+    Py_XDECREF(arg_type_name);
+#else
     PyErr_Format(PyExc_TypeError, "'%.200s' object is not a mapping", Py_TYPE(arg)->tp_name);
+#endif
 }
 
 

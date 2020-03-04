@@ -252,8 +252,16 @@ static int __Pyx_setup_reduce(PyObject* type_obj) {
     goto __PYX_GOOD;
 
 __PYX_BAD:
-    if (!PyErr_Occurred())
-        PyErr_Format(PyExc_RuntimeError, "Unable to initialize pickling for %s", __Pyx_PyType_Name(type_obj));
+    if (!PyErr_Occurred()) {
+#if CYTHON_COMPILING_IN_LIMITED_API
+        PyObject *type_obj_name = __Pyx_PyType_GetName((PyTypeObject *)type_obj);
+        PyErr_Format(PyExc_RuntimeError, "Unable to initialize pickling for %V",
+                     type_obj_name, "?");
+        Py_XDECREF(type_obj_name);
+#else
+        PyErr_Format(PyExc_RuntimeError, "Unable to initialize pickling for %s", ((PyTypeObject *)type_obj)->tp_name);
+#endif
+    }
     ret = -1;
 __PYX_GOOD:
 #if !CYTHON_USE_PYTYPE_LOOKUP

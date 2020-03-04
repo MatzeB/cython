@@ -796,10 +796,22 @@ static int __Pyx_MergeVtables(PyTypeObject *type) {
     free(base_vtables);
     return 0;
 bad:
+#if CYTHON_COMPILING_IN_LIMITED_API
+    {
+        PyObject *type_tp_base_name = __Pyx_PyType_GetName(type->tp_base);
+        PyObject *bases_i_name = __Pyx_PyType_GetName((PyTypeObject*)PyTuple_GET_ITEM(bases, i));
+        PyErr_Format(PyExc_TypeError,
+            "multiple bases have vtable conflict: '%V' and '%V'",
+            type_tp_base_name, "?", bases_i_name, "?");
+        Py_XDECREF(type_tp_base_name);
+        Py_XDECREF(bases_i_name);
+    }
+#else
     PyErr_Format(
         PyExc_TypeError,
         "multiple bases have vtable conflict: '%s' and '%s'",
         type->tp_base->tp_name, ((PyTypeObject*)PyTuple_GET_ITEM(bases, i))->tp_name);
+#endif
     free(base_vtables);
     return -1;
 }

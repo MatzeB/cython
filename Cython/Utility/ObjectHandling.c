@@ -185,8 +185,15 @@ static PyObject *__Pyx_PyIter_Next2Default(PyObject* defval) {
 }
 
 static void __Pyx_PyIter_Next_ErrorNoIterator(PyObject *iterator) {
+#if CYTHON_COMPILING_IN_LIMITED_API
+    PyObject* iterator_type_name = __Pyx_PyType_GetName(Py_TYPE(iterator));
+    PyErr_Format(PyErr_TypeError,
+        "%V object is not an iterator", iterator_type_name, "?");
+    Py_XDECREF(iterator_type_name);
+#else
     PyErr_Format(PyExc_TypeError,
         "%.200s object is not an iterator", Py_TYPE(iterator)->tp_name);
+#endif
 }
 
 // originally copied from Py3's builtin_next()
@@ -722,12 +729,32 @@ static CYTHON_INLINE int __Pyx_PyObject_SetSlice(PyObject* obj, PyObject* value,
         }
         return result;
     }
-    PyErr_Format(PyExc_TypeError,
 {{if access == 'Get'}}
+#if CYTHON_COMPILING_IN_LIMITED_API
+    {
+        PyObject *obj_type_name = __Pyx_PyType_GetName(Py_TYPE(obj));
+        PyErr_Format(PyExc_TypeError, "'%V' object is unsliceable",
+            obj_type_name, "?");
+        Py_XDECREF(obj_type_name);
+    }
+#else
+    PyErr_Format(PyExc_TypeError,
         "'%.200s' object is unsliceable", Py_TYPE(obj)->tp_name);
+#endif
 {{else}}
+#if CYTHON_COMPILING_IN_LIMITED_API
+    {
+        PyObject *obj_type_name = __Pyx_PyType_GetName(Py_TYPE(obj));
+        PyErr_Format(PyExc_TypeError,
+            "'%V' object does not support slice %.10s",
+            obj_type_name, "?", value ? "assignment" : "deletion");
+        Py_XDECREF(obj_type_name);
+    }
+#else
+    PyErr_Format(PyExc_TypeError,
         "'%.200s' object does not support slice %.10s",
         Py_TYPE(obj)->tp_name, value ? "assignment" : "deletion");
+#endif
 {{endif}}
 
 bad:
@@ -1089,8 +1116,19 @@ static CYTHON_INLINE int __Pyx_TypeTest(PyObject *obj, PyTypeObject *type) {
     }
     if (likely(__Pyx_TypeCheck(obj, type)))
         return 1;
+#if CYTHON_COMPILING_IN_LIMITED_API
+    {
+        PyObject *obj_type_name = __Pyx_PyType_GetName(Py_TYPE(obj));
+        PyObject *type_name = __Pyx_PyType_GetName(type);
+        PyErr_Format(PyExc_TypeError, "Cannot convert %V to %V",
+                     obj_type_name, "?", type_name, "?");
+        Py_XDECREF(obj_type_name);
+        Py_XDECREF(type_name);
+    }
+#else
     PyErr_Format(PyExc_TypeError, "Cannot convert %.200s to %.200s",
                  Py_TYPE(obj)->tp_name, type->tp_name);
+#endif
     return 0;
 }
 
@@ -1379,6 +1417,12 @@ static CYTHON_INLINE PyObject* __Pyx_PyObject_GenericGetAttrNoDict(PyObject* obj
 #if CYTHON_USE_TYPE_SLOTS && CYTHON_USE_PYTYPE_LOOKUP && PY_VERSION_HEX < 0x03070000
 
 static PyObject *__Pyx_RaiseGenericGetAttributeError(PyTypeObject *tp, PyObject *attr_name) {
+#if CYTHON_COMPILING_IN_LIMITED_API
+    PyObject *tp_name = __Pyx_PyType_GetName(tp);
+    PyErr_Format(PyExc_AttributeError, "'%V' object has no attribute '%U'",
+        tp_name, "?", attr_name);
+    Py_XDECREF(tp_name);
+#else
     PyErr_Format(PyExc_AttributeError,
 #if PY_MAJOR_VERSION >= 3
                  "'%.50s' object has no attribute '%U'",
@@ -1386,6 +1430,7 @@ static PyObject *__Pyx_RaiseGenericGetAttributeError(PyTypeObject *tp, PyObject 
 #else
                  "'%.50s' object has no attribute '%.400s'",
                  tp->tp_name, PyString_AS_STRING(attr_name));
+#endif
 #endif
     return NULL;
 }
@@ -1621,6 +1666,15 @@ static int __Pyx_PyObject_GetMethod(PyObject *obj, PyObject *name, PyObject **me
         return 0;
     }
 
+#if CYTHON_COMPILING_IN_LIMITED_API
+    {
+        PyObject *tp_name = __Pyx_PyType_GetName(tp);
+        PyErr_Format(PyExc_AttributeError,
+                     "'%V' object has no attribute '%U'",
+                     tp_name, "?", name);
+        Py_XDECREF(tp_name);
+    }
+#else
     PyErr_Format(PyExc_AttributeError,
 #if PY_MAJOR_VERSION >= 3
                  "'%.50s' object has no attribute '%U'",
@@ -1628,6 +1682,7 @@ static int __Pyx_PyObject_GetMethod(PyObject *obj, PyObject *name, PyObject **me
 #else
                  "'%.50s' object has no attribute '%.400s'",
                  tp->tp_name, PyString_AS_STRING(name));
+#endif
 #endif
     return 0;
 
@@ -2458,11 +2513,23 @@ static PyObject* __Pyx__PyNumber_MatrixMultiply(PyObject* x, PyObject* y, const 
     if (!right_is_subtype) {
         __Pyx_TryMatrixMethod(y, x, PYIDENT("__rmatmul__"))
     }
+#if CYTHON_COMPILING_IN_LIMITED_API
+    {
+        PyObject *x_type_name = __Pyx_PyType_GetName(Py_TYPE(x));
+        PyObject *y_type_name = __Pyx_PyType_GetName(Py_TYPE(y));
+        PyErr_Format(PyExc_TypeError,
+                     "unsupported operand type(s) for %.2s: '%V' and '%V'",
+                     op_name, x_type_name, "?", y_type_name, "?");
+        Py_XDECREF(x_type_name);
+        Py_XDECREF(y_type_name);
+    }
+#else
     PyErr_Format(PyExc_TypeError,
                  "unsupported operand type(s) for %.2s: '%.100s' and '%.100s'",
                  op_name,
                  Py_TYPE(x)->tp_name,
                  Py_TYPE(y)->tp_name);
+#endif
     return NULL;
 }
 

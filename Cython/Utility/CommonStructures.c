@@ -32,17 +32,53 @@ static int __Pyx_VerifyCachedType(PyObject *cached_type,
     return 0;
 }
 
+#if CYTHON_COMPILING_IN_LIMITED_API
+static int __Pyx_VerifyCachedTypeWithUnicode(PyObject *cached_type,
+                               PyObject *name,
+                               Py_ssize_t basicsize,
+                               Py_ssize_t expected_basicsize) {
+    if (!PyType_Check(cached_type)) {
+        PyErr_Format(PyExc_TypeError,
+            "Shared Cython type %V is not a type object", name, "?");
+        return -1;
+    }
+    if (basicsize != expected_basicsize) {
+        PyErr_Format(PyExc_TypeError,
+            "Shared Cython type %V has the wrong size, try recompiling",
+            name, "?");
+        return -1;
+    }
+    return 0;
+}
+#endif
+
 static PyTypeObject* __Pyx_FetchCommonType(PyTypeObject* type) {
     PyObject* abi_module;
     PyTypeObject *cached_type = NULL;
+#if CYTHON_COMPILING_IN_LIMITED_API
+    PyObject *type_name;
+#else
+    const char *type_name;
+#endif
 
     abi_module = __Pyx_FetchSharedCythonABIModule();
     if (!abi_module) return NULL;
-    cached_type = (PyTypeObject*) PyObject_GetAttrString(abi_module, type->tp_name);
+#if CYTHON_COMPILING_IN_LIMITED_API
+    type_name = __Pyx_PyType_GetName(type);
+    if (type_name == NULL) return NULL;
+    cached_type = (PyTypeObject*) PyObject_GetAttr(abi_module, type_name);
+#else
+    type_name = type->tp_name;
+    cached_type = (PyTypeObject*) PyObject_GetAttrString(abi_module, type_name);
+#endif
     if (cached_type) {
+#if CYTHON_COMPILING_IN_LIMITED_API
+        if (__Pyx_VerifyCachedTypeWithUnicode(
+#else
         if (__Pyx_VerifyCachedType(
+#endif
               (PyObject *)cached_type,
-              type->tp_name,
+              type_name,
               cached_type->tp_basicsize,
               type->tp_basicsize) < 0) {
             goto bad;
@@ -53,17 +89,27 @@ static PyTypeObject* __Pyx_FetchCommonType(PyTypeObject* type) {
     if (!PyErr_ExceptionMatches(PyExc_AttributeError)) goto bad;
     PyErr_Clear();
     if (PyType_Ready(type) < 0) goto bad;
-    if (PyObject_SetAttrString(abi_module, type->tp_name, (PyObject *)type) < 0)
+#if CYTHON_COMPILING_IN_LIMITED_API
+    if (PyObject_SetAttr(abi_module, type_name, (PyObject *)type) < 0)
+#else
+    if (PyObject_SetAttrString(abi_module, type_name, (PyObject *)type) < 0)
+#endif
         goto bad;
     Py_INCREF(type);
     cached_type = type;
 
 done:
     Py_DECREF(abi_module);
+#if CYTHON_COMPILING_IN_LIMITED_API
+    Py_DECREF(type_name);
+#endif
     // NOTE: always returns owned reference, or NULL on error
     return cached_type;
 
 bad:
+#if CYTHON_COMPILING_IN_LIMITED_API
+    Py_DECREF(type_name);
+#endif
     Py_XDECREF(cached_type);
     cached_type = NULL;
     goto done;

@@ -6,9 +6,17 @@ static CYTHON_INLINE PyObject* __Pyx_Generator_Yield_From(__pyx_CoroutineObject 
 //@requires: Generator
 
 static void __PyxPyIter_CheckErrorAndDecref(PyObject *source) {
+#if CYTHON_COMPILING_IN_LIMITED_API
+    PyObject *source_type_name = __Pyx_PyType_GetName(Py_TYPE(source));
+    PyErr_Format(PyExc_TypeError,
+                 "iter() returned non-iterator of type '%V'",
+                 source_type_name, "?");
+    Py_XDECREF(source_type_name);
+#else
     PyErr_Format(PyExc_TypeError,
                  "iter() returned non-iterator of type '%.100s'",
                  Py_TYPE(source)->tp_name);
+#endif
     Py_DECREF(source);
 }
 
@@ -152,11 +160,23 @@ static void __Pyx_Coroutine_AwaitableIterError(PyObject *source) {
     }
     Py_DECREF(exc);
     assert(!PyErr_Occurred());
+#if CYTHON_COMPILING_IN_LIMITED_API
+    {
+        PyObject *source_type_name;
+        source_type_name = __Pyx_PyType_GetName(Py_TYPE(source));
+        PyErr_Format(PyExc_TypeError,
+            "'async for' received an invalid object from __anext__: %V",
+            source_type_name, "?");
+        Py_XDECREF(source_type_name);
+    }
+#else
     PyErr_Format(
         PyExc_TypeError,
         "'async for' received an invalid object "
         "from __anext__: %.100s",
         Py_TYPE(source)->tp_name);
+
+#endif
 
     PyErr_Fetch(&exc, &val2, &tb);
     PyErr_NormalizeException(&exc, &val2, &tb);
@@ -207,9 +227,17 @@ static PyObject *__Pyx__Coroutine_GetAwaitableIter(PyObject *obj) {
         goto bad;
     }
     if (unlikely(!PyIter_Check(res))) {
+#if CYTHON_COMPILING_IN_LIMITED_API
+        PyObject *res_type_name = __Pyx_PyType_GetName(Py_TYPE(res));
+        PyErr_Format(PyExc_TypeError,
+             "__await__() returned non-iterator of type '%V'",
+             res_type_name, "?");
+        Py_XDECREF(res_type_name);
+#else
         PyErr_Format(PyExc_TypeError,
                      "__await__() returned non-iterator of type '%.100s'",
                      Py_TYPE(res)->tp_name);
+#endif
         Py_CLEAR(res);
     } else {
         int is_coroutine = 0;
@@ -229,9 +257,19 @@ static PyObject *__Pyx__Coroutine_GetAwaitableIter(PyObject *obj) {
     }
     return res;
 slot_error:
+#if CYTHON_COMPILING_IN_LIMITED_API
+    {
+        PyObject *obj_type_name = __Pyx_PyType_GetName(Py_TYPE(obj));
+        PyErr_Format(PyExc_TypeError,
+             "object %V can't be used in 'await' expression",
+             obj_type_name, "?");
+        Py_XDECREF(obj_type_name);
+    }
+#else
     PyErr_Format(PyExc_TypeError,
                  "object %.100s can't be used in 'await' expression",
                  Py_TYPE(obj)->tp_name);
+#endif
 bad:
     return NULL;
 }
@@ -261,8 +299,18 @@ static PyObject *__Pyx_Coroutine_GetAsyncIter_Generic(PyObject *obj) {
     if ((0)) (void) __Pyx_PyObject_CallMethod0(obj, PYIDENT("__aiter__"));
 #endif
 
+#if CYTHON_COMPILING_IN_LIMITED_API
+    {
+        PyObject *obj_type_name = __Pyx_PyType_GetName(Py_TYPE(obj));
+        PyErr_Format(PyExc_TypeError,
+            "'async for' requires an object with __aiter__ method, got %V",
+            obj_type_name, "?");
+        Py_XDECREF(obj_type_name);
+    }
+#else
     PyErr_Format(PyExc_TypeError, "'async for' requires an object with __aiter__ method, got %.100s",
                  Py_TYPE(obj)->tp_name);
+#endif
     return NULL;
 }
 
@@ -295,8 +343,18 @@ static PyObject *__Pyx__Coroutine_AsyncIterNext(PyObject *obj) {
     // FIXME: for the sake of a nicely conforming exception message, assume any AttributeError meant '__anext__'
     if (PyErr_ExceptionMatches(PyExc_AttributeError))
 #endif
+#if CYTHON_COMPILING_IN_LIMITED_API
+    {
+        PyObject *obj_type_name = __Pyx_PyType_GetName(Py_TYPE(obj));
+        PyErr_Format(PyExc_TypeError,
+            "'async for' requires an object with __anext__ method, got %V",
+            obj_type_name, "?");
+        Py_XDECREF(obj_type_name);
+    }
+#else
         PyErr_Format(PyExc_TypeError, "'async for' requires an object with __anext__ method, got %.100s",
                      Py_TYPE(obj)->tp_name);
+#endif
     return NULL;
 }
 

@@ -69,8 +69,15 @@ static PyObject* __Pyx_PyExec3(PyObject* o, PyObject* globals, PyObject* locals)
     if (!globals || globals == Py_None) {
         globals = $moddict_cname;
     } else if (!PyDict_Check(globals)) {
+        #if CYTHON_COMPILING_IN_LIMITED_API
+        PyObject *globals_type_name = __Pyx_PyType_GetName(Py_TYPE(globals));
+        PyErr_Format(PyExc_TypeError, "exec() arg 2 must be a dict, not %V",
+                     globals_type_name, "?");
+        Py_XDECREF(globals_type_name);
+        #else
         PyErr_Format(PyExc_TypeError, "exec() arg 2 must be a dict, not %.200s",
                      Py_TYPE(globals)->tp_name);
+        #endif
         goto bad;
     }
     if (!locals || locals == Py_None) {
@@ -106,9 +113,17 @@ static PyObject* __Pyx_PyExec3(PyObject* o, PyObject* globals, PyObject* locals)
         #else
         } else if (!PyString_Check(o)) {
         #endif
+            #if CYTHON_COMPILING_IN_LIMITED_API
+            PyObject *o_type_name = __Pyx_PyType_GetName(Py_TYPE(o));
+            PyErr_Format(PyExc_TypeError,
+                "exec: arg 1 must be string, bytes or code object, got %V",
+                o_type_name, "?");
+            Py_XDECREF(o_type_name);
+            #else
             PyErr_Format(PyExc_TypeError,
                 "exec: arg 1 must be string, bytes or code object, got %.200s",
                 Py_TYPE(o)->tp_name);
+            #endif
             goto bad;
         }
         #if PY_MAJOR_VERSION >= 3
@@ -197,7 +212,13 @@ static PyObject* __Pyx_Intern(PyObject* s); /* proto */
 
 static PyObject* __Pyx_Intern(PyObject* s) {
     if (!(likely(PyString_CheckExact(s)))) {
-        PyErr_Format(PyExc_TypeError, "Expected %.16s, got %.200s", "str", Py_TYPE(s)->tp_name);
+        #if CYTHON_COMPILING_IN_LIMITED_API
+        PyObject *s_type_name = __Pyx_PyType_GetName(Py_TYPE(s));
+        PyErr_Format(PyExc_TypeError, "Expected str, got %V", s_type_name, "?");
+        Py_XDECREF(s_type_name);
+        #else
+        PyErr_Format(PyExc_TypeError, "Expected str, got %.200s", Py_TYPE(s)->tp_name);
+        #endif
         return 0;
     }
     Py_INCREF(s);
@@ -306,8 +327,16 @@ static long __Pyx__PyObject_Ord(PyObject* c) {
 #endif
     } else {
         // FIXME: support character buffers - but CPython doesn't support them either
+#if CYTHON_COMPILING_IN_LIMITED_API
+        PyObject *c_type_name = __Pyx_PyType_GetName(Py_TYPE(c));
         PyErr_Format(PyExc_TypeError,
-            "ord() expected string of length 1, but %.200s found", c->ob_type->tp_name);
+            "ord() expected string of length 1, but %V found", c_type_name,
+            "?");
+        Py_XDECREF(c_type_name);
+#else
+        PyErr_Format(PyExc_TypeError,
+            "ord() expected string of length 1, but %.200s found", Py_TYPE(c)->tp_name);
+#endif
         return (long)(Py_UCS4)-1;
     }
     PyErr_Format(PyExc_TypeError,

@@ -317,20 +317,40 @@ static PyObject* __Pyx_PyNumber_IntOrLongWrongResultType(PyObject* result, const
 #if PY_MAJOR_VERSION >= 3
     if (PyLong_Check(result)) {
         // CPython issue #17576: warn if 'result' not of exact type int.
-        if (PyErr_WarnFormat(PyExc_DeprecationWarning, 1,
+#if CYTHON_COMPILING_IN_LIMITED_API
+        PyObject *result_type_name = __Pyx_PyType_GetName(Py_TYPE(result));
+        int warn_result = PyErr_WarnFormat(PyExc_DeprecationWarning, 1,
+                "__int__ returned non-int (type %V).  "
+                "The ability to return an instance of a strict subclass of int "
+                "is deprecated, and may be removed in a future version of Python.",
+                result_type_name, "?");
+        Py_XDECREF(result_type_name);
+#else
+        int warn_result = PyErr_WarnFormat(PyExc_DeprecationWarning, 1,
                 "__int__ returned non-int (type %.200s).  "
                 "The ability to return an instance of a strict subclass of int "
                 "is deprecated, and may be removed in a future version of Python.",
-                __Pyx_PyType_Name(Py_TYPE(result)))) {
+                Py_TYPE(result)->tp_name);
+#endif
+        if (warn_result) {
             Py_DECREF(result);
             return NULL;
         }
         return result;
     }
 #endif
+
+#if CYTHON_COMPILING_IN_LIMITED_API
+    PyObject *result_type_name = __Pyx_PyType_GetName(Py_TYPE(result));
+    PyErr_Format(PyExc_TypeError,
+                 "__%.4s__ returned non-%.4s (type %V)",
+                 type_name, type_name, result_type_name, "?");
+    Py_XDECREF(result_type_name);
+#else
     PyErr_Format(PyExc_TypeError,
                  "__%.4s__ returned non-%.4s (type %.200s)",
-                 type_name, type_name, __Pyx_PyType_Name(Py_TYPE(result)));
+                 type_name, type_name, Py_TYPE(result)->tp_name);
+#endif
     Py_DECREF(result);
     return NULL;
 }
@@ -492,7 +512,14 @@ static {{struct_type_decl}} {{funcname}}(PyObject * o) {
     {{struct_type_decl}} result;
 
     if (!PyTuple_Check(o) || PyTuple_GET_SIZE(o) != {{size}}) {
-        PyErr_Format(PyExc_TypeError, "Expected %.16s of size %d, got %.200s", "a tuple", {{size}}, Py_TYPE(o)->tp_name);
+#if CYTHON_COMPILING_IN_LIMITED_API
+        PyObject *o_type_name = __Pyx_PyType_GetName(Py_TYPE(o));
+        PyErr_Format(PyExc_TypeError, "Expected a tuple of size %d, got %V",
+            {{size}}, o_type_name, "?");
+        Py_XDECREF(o_type_name);
+#else
+        PyErr_Format(PyExc_TypeError, "Expected a tuple of size %d, got %.200s", {{size}}, Py_TYPE(o)->tp_name);
+#endif
         goto bad;
     }
 
@@ -1001,4 +1028,26 @@ raise_neg_overflow:
     PyErr_SetString(PyExc_OverflowError,
         "can't convert negative value to {{TYPE}}");
     return ({{TYPE}}) -1;
+}
+
+/////////////// RaiseTypeErrorExpected.proto ///////////////
+
+static CYTHON_INLINE int __Pyx_RaiseTypeErrorExpected(const char *expected,
+                                                      PyObject *obj);
+
+/////////////// RaiseTypeErrorExpected ///////////////
+
+static CYTHON_INLINE int __Pyx_RaiseTypeErrorExpected(const char *expected,
+                                                      PyObject *obj) {
+#if CYTHON_COMPILING_IN_LIMITED_API
+    PyObject* obj_type_name =
+        __Pyx_PyType_GetName(Py_TYPE(obj));
+    PyErr_Format(PyExc_TypeError, "Expected %s, got %V", expected,
+                 obj_type_name, "?");
+    Py_XDECREF(obj_type_name);
+#else
+    PyErr_Format(PyExc_TypeError, "Expected %s, got %.200s", expected,
+                 Py_TYPE(obj)->tp_name);
+#endif
+    return 0;
 }
