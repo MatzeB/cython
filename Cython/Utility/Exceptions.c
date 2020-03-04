@@ -634,10 +634,12 @@ static void __Pyx_WriteUnraisable(const char *name, CYTHON_UNUSED int clineno,
 
 /////////////// CLineInTraceback.proto ///////////////
 
+#if !CYTHON_COMPILING_IN_LIMITED_API
 #ifdef CYTHON_CLINE_IN_TRACEBACK  /* 0 or 1 to disable/enable C line display in tracebacks at C compile time */
 #define __Pyx_CLineForTraceback(tstate, c_line)  (((CYTHON_CLINE_IN_TRACEBACK)) ? c_line : 0)
 #else
 static int __Pyx_CLineForTraceback(PyThreadState *tstate, int c_line);/*proto*/
+#endif
 #endif
 
 /////////////// CLineInTraceback ///////////////
@@ -646,6 +648,7 @@ static int __Pyx_CLineForTraceback(PyThreadState *tstate, int c_line);/*proto*/
 //@requires: PyErrFetchRestore
 //@substitute: naming
 
+#if !CYTHON_COMPILING_IN_LIMITED_API
 #ifndef CYTHON_CLINE_IN_TRACEBACK
 static int __Pyx_CLineForTraceback(CYTHON_NCP_UNUSED PyThreadState *tstate, int c_line) {
     PyObject *use_cline;
@@ -690,6 +693,7 @@ static int __Pyx_CLineForTraceback(CYTHON_NCP_UNUSED PyThreadState *tstate, int 
     return c_line;
 }
 #endif
+#endif
 
 /////////////// AddTraceback.proto ///////////////
 
@@ -701,19 +705,17 @@ static void __Pyx_AddTraceback(const char *funcname, int c_line,
 //@requires: CLineInTraceback
 //@substitute: naming
 
+#if CYTHON_COMPILING_IN_LIMITED_API
+static void __Pyx_AddTraceback(const char *funcname, int c_line,
+                               int py_line, const char *filename) {
+    // There is no API to add to a traceback in the limited API.
+}
+#else
+
 #include "compile.h"
 #include "frameobject.h"
 #include "traceback.h"
 
-#if CYTHON_COMPILING_IN_LIMITED_API
-static void __Pyx_AddTraceback(const char *funcname, int c_line,
-                               int py_line, const char *filename) {
-    if (c_line) {
-        c_line = __Pyx_CLineForTraceback(__Pyx_PyThreadState_Current, c_line);
-    }
-    _PyTraceback_Add(funcname, filename, c_line ? -c_line : py_line);
-}
-#else
 static PyCodeObject* __Pyx_CreateCodeObjectForTraceback(
             const char *funcname, int c_line,
             int py_line, const char *filename) {
