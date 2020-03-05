@@ -38,7 +38,8 @@ from .Builtin import list_type, tuple_type, set_type, dict_type, type_type, \
 from . import Builtin
 from . import Symtab
 from .. import Utils
-from .Annotate import AnnotationItem
+# TODO(T55176519): Add unicode database
+#from .Annotate import AnnotationItem
 from . import Future
 from ..Debugging import print_call_chain
 from .DebugFlags import debug_disposal_code, debug_temp_alloc, \
