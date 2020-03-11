@@ -1665,3 +1665,13 @@ static void __Pyx_FastGilFuncInit(void) {
 }
 
 #endif
+
+/////////////// StaticAssert ///////////////
+
+#if defined(__STDC_VERSION__) && __STDC_VERSION__ >= 201112L || (defined(__has_feature) && __has_feature(c_static_assert))
+  #define __Pyx_static_assert(condition, message) _Static_assert(condition, message)
+#elif (defined(__cplusplus) && __cplusplus >= 201103LL) || (defined(__has_feature) && __has_feature(cxx_static_assert))
+  #define __Pyx_static_assert(condition, message) static_assert(condition, message)
+#else
+  #define __Pyx_static_assert(condition, message) do { char static_assertion_[(condition)?1:-1]; (void)static_assertion_; } while(0)
+#endif

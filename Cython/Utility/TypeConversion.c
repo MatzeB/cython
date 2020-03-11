@@ -673,6 +673,7 @@ static CYTHON_INLINE Py_UNICODE __Pyx_PyObject_AsPy_UNICODE(PyObject* x) {
 static CYTHON_INLINE PyObject* {{TO_PY_FUNCTION}}({{TYPE}} value);
 
 /////////////// CIntToPy ///////////////
+//@requires: ModuleSetupCode.c::StaticAssert
 
 static CYTHON_INLINE PyObject* {{TO_PY_FUNCTION}}({{TYPE}} value) {
     const {{TYPE}} neg_one = ({{TYPE}}) (({{TYPE}}) 0 - ({{TYPE}}) 1), const_zero = ({{TYPE}}) 0;
@@ -696,12 +697,25 @@ static CYTHON_INLINE PyObject* {{TO_PY_FUNCTION}}({{TYPE}} value) {
 #endif
         }
     }
+
+#if CYTHON_COMPILING_IN_LIMITED_API
+#ifdef HAVE_LONG_LONG
+    __Pyx_static_assert(sizeof({{TYPE}}) <= sizeof(PY_LONG_LONG),
+                        "Cannot convert from integer bigger than long long");
+#else
+    __Pyx_static_assert(sizeof({{TYPE}}) <= sizeof(long),
+                        "Cannot convert from integer bigger than long");
+#endif
+    fprintf(stderr, "Conversion from {{TYPE}} not supported\n");
+    abort();
+#else
     {
         int one = 1; int little = (int)*(unsigned char *)&one;
         unsigned char *bytes = (unsigned char *)&value;
         return _PyLong_FromByteArray(bytes, sizeof({{TYPE}}),
                                      little, !is_unsigned);
     }
+#endif
 }
 
 
