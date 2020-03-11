@@ -523,6 +523,88 @@ class __Pyx_FakeReference {
   #define PyMem_RawFree(p)             PyMem_Free(p)
 #endif
 
+#if CYTHON_COMPILING_IN_LIMITED_API
+
+/* CPython somtimes provides an invalid definition of some macros when the
+ * limited API is enabled. Undefine them first. */
+#ifdef PySequence_ITEM
+#undef PySequence_ITEM
+#endif
+#ifdef PyFunction_GET_CLOSURE
+#undef PyFunction_GET_CLOSURE
+#endif
+#ifdef PyFunction_GET_CODE
+#undef PyFunction_GET_CODE
+#endif
+#ifdef PyFunction_GET_DEFAULTS
+#undef PyFunction_GET_DEFAULTS
+#endif
+#ifdef PyFunction_GET_GLOBALS
+#undef PyFunction_GET_GLOBALS
+#endif
+#ifdef PyFunction_GET_KW_DEFAULTS
+#undef PyFunction_GET_KW_DEFAULTS
+#endif
+
+#ifndef PyByteArray_AS_STRING
+#define PyByteArray_AS_STRING(op) PyByteArray_AsString((PyObject*)(op))
+#endif
+#ifndef PyByteArray_GET_SIZE
+#define PyByteArray_GET_SIZE(op) PyByteArray_Size((PyObject*)(op))
+#endif
+#ifndef PyBytes_AS_STRING
+#define PyBytes_AS_STRING(op) PyBytes_AsString((PyObject*)(op))
+#endif
+#ifndef PyBytes_GET_SIZE
+#define PyBytes_GET_SIZE(op) PyBytes_Size((PyObject*)(op))
+#endif
+#ifndef PyCFunction_GET_FUNCTION
+#define PyCFunction_GET_FUNCTION(func) PyCFunction_GetFunction((PyObject*)(func))
+#endif
+#ifndef PyCFunction_GET_SELF
+#define PyCFunction_GET_SELF(func) PyCFunction_GetSelf((PyObject*)(func))
+#endif
+#ifndef PyCFunction_GET_FLAGS
+#define PyCFunction_GET_FLAGS(func) PyCFunction_GetFlags((PyObject*)(func))
+#endif
+#define PyFunction_GET_CLOSURE(func) PyFunction_GetClosure((PyObject*)(func))
+#define PyFunction_GET_CODE(func) PyFunction_GetCode((PyObject*)(func))
+#define PyFunction_GET_DEFAULTS(func) PyFunction_GetDefaults((PyObject*)(func))
+#define PyFunction_GET_GLOBALS(func) PyFunction_GetGlobals((PyObject*)(func))
+#define PyFunction_GET_KW_DEFAULTS(func) PyFunction_GetKwDefaults((PyObject*)(func))
+#ifndef PyList_GET_ITEM
+#define PyList_GET_ITEM(op, i) PyList_GetItem((PyObject*)(op), (i))
+#endif
+#ifndef PyList_GET_SIZE
+#define PyList_GET_SIZE(op) PyList_Size((PyObject*)(op))
+#endif
+#ifndef PyList_SET_ITEM
+#define PyList_SET_ITEM(op, i, v) PyList_SetItem((PyObject*)(op), (i), (v))
+#endif
+#define PySequence_ITEM(op, i) PySequence_GetItem((PyObject*)(op), (i))
+#ifndef PySet_GET_SIZE
+#define PySet_GET_SIZE(op) PySet_Size((PyObject*)(op))
+#endif
+#ifndef PyTuple_GET_ITEM
+#define PyTuple_GET_ITEM(op, i) PyTuple_GetItem((PyObject*)(op), (i))
+#endif
+#ifndef PyTuple_GET_SIZE
+#define PyTuple_GET_SIZE(op) PyTuple_Size((PyObject*)(op))
+#endif
+#ifndef PyTuple_SET_ITEM
+#define PyTuple_SET_ITEM(op, i, v) PyTuple_SetItem((PyObject*)(op), (i), (v))
+#endif
+#ifndef PyUnicode_GET_LENGTH
+#define PyUnicode_GET_LENGTH(op) PyUnicode_GetLength((PyObject*)(op))
+#endif
+#ifndef PyUnicode_GET_SIZE
+#define PyUnicode_GET_SIZE(op) PyUnicode_GetSize((PyObject*)(op))
+#endif
+#ifndef PyWeakref_GET_OBJECT
+#define PyWeakref_GET_OBJECT(op) PyWeakref_GetObject((PyObject*)(op))
+#endif
+#endif
+
 #if CYTHON_COMPILING_IN_PYSTON
   // special C-API functions only in Pyston
   #define __Pyx_PyCode_HasFreeVars(co)  PyCode_HasFreeVars(co)
