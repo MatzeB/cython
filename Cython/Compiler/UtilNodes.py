@@ -360,3 +360,47 @@ class TempResultFromStatNode(ExprNodes.ExprNode):
     def generate_result_code(self, code):
         self.result_ref.result_code = self.result()
         self.body.generate_execution_code(code)
+
+
+class ScopeWithCleanupNode(Nodes.StatNode):
+    """Generates code for the `body` statement followed by code for the
+    `cleanup` statement. The code is generated in a way to make sure `cleanup`
+    is always executed even if `body` encountered an error and jumps to the
+    error label."""
+
+    child_attrs = ['body', 'cleanup']
+
+    def __init__(self, body, cleanup, scope_name="scope_with_cleanup"):
+        self.pos = body.pos
+        self.body = body
+        self.cleanup = cleanup
+        self.scope_name = scope_name
+
+    def generate_function_definitions(self, env, code):
+        self.body.generate_function_definitions(env, code)
+        self.cleanup.generate_function_definitions(env, code)
+
+    def generate_execution_code(self, code):
+        code.mark_pos(self.body.pos)
+        code.putln("/*" + self.scope_name + ":*/ {")
+
+        # Switch error destination and generate body code followed by cleanup.
+        old_error_label = code.new_error_label()
+        our_error_label = code.error_label
+        self.body.generate_execution_code(code)
+        code.error_label = old_error_label
+        self.cleanup.generate_execution_code(code)
+
+        # If error label was used, put a copy of the cleanup code there and jump
+        # to original error label.
+        if code.label_used(our_error_label):
+            end_label = code.new_label(self.scope_name + "_done")
+            code.put_goto(end_label)
+
+            code.put_label(our_error_label)
+            self.cleanup.generate_execution_code(code)
+            code.put_goto(old_error_label)
+
+            code.put_label(end_label)
+
+        code.putln("}")
