@@ -702,6 +702,7 @@ static void __Pyx_AddTraceback(const char *funcname, int c_line,
 
 /////////////// AddTraceback ///////////////
 //@requires: ModuleSetupCode.c::CodeObjectCache
+//@requires: ModuleSetupCode.c::PyCodeNew
 //@requires: CLineInTraceback
 //@substitute: naming
 
@@ -709,6 +710,7 @@ static void __Pyx_AddTraceback(const char *funcname, int c_line,
 static void __Pyx_AddTraceback(const char *funcname, int c_line,
                                int py_line, const char *filename) {
     // There is no API to add to a traceback in the limited API.
+    (void)__Pyx_PyCode_New;
 }
 #else
 

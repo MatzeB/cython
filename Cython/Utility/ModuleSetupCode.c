@@ -453,22 +453,9 @@ class __Pyx_FakeReference {
 #if PY_MAJOR_VERSION < 3
   #define __Pyx_BUILTIN_MODULE_NAME "__builtin__"
   #define __Pyx_DefaultClassType PyClass_Type
-  #define __Pyx_PyCode_New(a, p, k, l, s, f, code, c, n, v, fv, cell, fn, name, fline, lnos) \
-          PyCode_New(a+k, l, s, f, code, c, n, v, fv, cell, fn, name, fline, lnos)
 #else
   #define __Pyx_BUILTIN_MODULE_NAME "builtins"
   #define __Pyx_DefaultClassType PyType_Type
-#if PY_VERSION_HEX >= 0x030800B2
-  #define __Pyx_PyCode_New(a, p, k, l, s, f, code, c, n, v, fv, cell, fn, name, fline, lnos) \
-          PyCode_NewWithPosOnlyArgs(a, p, k, l, s, f, code, c, n, v, fv, cell, fn, name, fline, lnos)
-#elif PY_VERSION_HEX >= 0x030800A4
-  // TODO: remove this special case once Py3.8 is released.
-  #define __Pyx_PyCode_New(a, p, k, l, s, f, code, c, n, v, fv, cell, fn, name, fline, lnos) \
-          PyCode_New(a, p, k, l, s, f, code, c, n, v, fv, cell, fn, name, fline, lnos)
-#else
-  #define __Pyx_PyCode_New(a, p, k, l, s, f, code, c, n, v, fv, cell, fn, name, fline, lnos) \
-          PyCode_New(a, k, l, s, f, code, c, n, v, fv, cell, fn, name, fline, lnos)
-#endif
 #endif
 
 #ifndef Py_TPFLAGS_CHECKTYPES
@@ -824,6 +811,79 @@ static PyObject * __Pyx_PyType_GetName(PyTypeObject* tp) {
         unaryfunc am_aiter;
         unaryfunc am_anext;
     } __Pyx_PyAsyncMethodsStruct;
+#endif
+
+
+/////////////// PyCodeNew.proto ///////////////
+
+#if CYTHON_COMPILING_IN_LIMITED_API
+  #ifndef CO_OPTIMIZED
+    #define CO_OPTIMIZED 0x0001
+  #endif
+  #ifndef CO_NEWLOCALS
+    #define CO_NEWLOCALS 0x0002
+  #endif
+  #ifndef CO_VARARGS
+    #define CO_VARARGS 0x0004
+  #endif
+  #ifndef CO_VARKEYWORDS
+    #define CO_VARKEYWORDS 0x0008
+  #endif
+  #ifndef CO_NESTED
+    #define CO_NESTED 0x0010
+  #endif
+  #ifndef CO_GENERATOR
+    #define CO_GENERATOR 0x0020
+  #endif
+  #ifndef CO_COROUTINE
+    #define CO_COROUTINE 0x0080
+  #endif
+  #ifndef CO_ITERABLE_COROUTINE
+    #define CO_ITERABLE_COROUTINE 0x0100
+  #endif
+  #ifndef CO_ASYNC_GENERATOR
+    #define CO_ASYNC_GENERATOR 0x0200
+  #endif
+  static PyObject *__Pyx_PyCode_New(int argcount, int posonlyargcount,
+                                    int kwonlyargcount, int nlocals,
+                                    int stacksize, int flags, PyObject *code,
+                                    PyObject *consts, PyObject *names,
+                                    PyObject *varnames, PyObject *freevars,
+                                    PyObject *cellvars, PyObject *filename,
+                                    PyObject *name, int firstlineno,
+                                    PyObject *lnotab);
+#elif PY_MAJOR_VERSION < 3
+  #define __Pyx_PyCode_New(a, p, k, l, s, f, code, c, n, v, fv, cell, fn, name, fline, lnos) \
+          PyCode_New(a+k, l, s, f, code, c, n, v, fv, cell, fn, name, fline, lnos)
+#elif PY_VERSION_HEX >= 0x030800B2
+  #define __Pyx_PyCode_New(a, p, k, l, s, f, code, c, n, v, fv, cell, fn, name, fline, lnos) \
+          PyCode_NewWithPosOnlyArgs(a, p, k, l, s, f, code, c, n, v, fv, cell, fn, name, fline, lnos)
+#elif PY_VERSION_HEX >= 0x030800A4
+  // TODO: remove this special case once Py3.8 is released.
+  #define __Pyx_PyCode_New(a, p, k, l, s, f, code, c, n, v, fv, cell, fn, name, fline, lnos) \
+          PyCode_New(a, p, k, l, s, f, code, c, n, v, fv, cell, fn, name, fline, lnos)
+#else
+  #define __Pyx_PyCode_New(a, p, k, l, s, f, code, c, n, v, fv, cell, fn, name, fline, lnos) \
+          PyCode_New(a, k, l, s, f, code, c, n, v, fv, cell, fn, name, fline, lnos)
+#endif
+
+
+/////////////// PyCodeNew ///////////////
+
+#if CYTHON_COMPILING_IN_LIMITED_API
+static PyObject *__Pyx_PyCode_New(int argcount, int posonlyargcount,
+                                  int kwonlyargcount, int nlocals,
+                                  int stacksize, int flags, PyObject *code,
+                                  PyObject *consts, PyObject *names,
+                                  PyObject *varnames, PyObject *freevars,
+                                  PyObject *cellvars, PyObject *filename,
+                                  PyObject *name, int firstlineno,
+                                  PyObject *lnotab) {
+  // TODO(matthiasb): Create an object that behaves like a code object, so
+  // that users can at least inspect co_xxx members.
+  Py_INCREF(Py_None);
+  return Py_None;
+}
 #endif
 
 

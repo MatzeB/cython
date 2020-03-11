@@ -9511,6 +9511,8 @@ class CodeObjectNode(ExprNode):
         if self.def_node.starstar_arg:
             flags.append('CO_VARKEYWORDS')
 
+        code.globalstate.use_utility_code(
+            UtilityCode.load_cached("PyCodeNew", "ModuleSetupCode.c"))
         code.putln("%s = (PyObject*)__Pyx_PyCode_New(%d, %d, %d, %d, 0, %s, %s, %s, %s, %s, %s, %s, %s, %s, %d, %s); %s" % (
             self.result_code,
             len(func.args) - func.num_kwonly_args,  # argcount
