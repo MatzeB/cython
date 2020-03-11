@@ -458,6 +458,14 @@ static CYTHON_INLINE Py_UCS4 __Pyx_GetItemInt_Unicode_Fast(PyObject* ustring, Py
 }
 
 
+//////////////////// NewEmpty.proto ////////////////////
+
+#if PY_VERSION_HEX >= 0x03030000 && !CYTHON_COMPILING_IN_LIMITED_API
+#define __Pyx_PyUnicode_NewEmpty() PyUnicode_New(0, 0)
+#else
+#define __Pyx_PyUnicode_NewEmpty() PyUnicode_FromStringAndSize(NULL, 0)
+#endif
+
 /////////////// decode_c_string_utf16.proto ///////////////
 
 static CYTHON_INLINE PyObject *__Pyx_PyUnicode_DecodeUTF16(const char *s, Py_ssize_t size, const char *errors) {
@@ -494,6 +502,7 @@ static CYTHON_INLINE PyObject* __Pyx_decode_c_string(
 
 /////////////// decode_c_string ///////////////
 //@requires: IncludeStringH
+//@requires: NewEmpty
 //@requires: decode_c_string_utf16
 
 /* duplicate code to avoid calling strlen() if start >= 0 and stop >= 0 */
@@ -520,7 +529,7 @@ static CYTHON_INLINE PyObject* __Pyx_decode_c_string(
     }
     length = stop - start;
     if (unlikely(length <= 0))
-        return PyUnicode_FromUnicode(NULL, 0);
+        return __Pyx_PyUnicode_NewEmpty();
     cstring += start;
     if (decode_func) {
         return decode_func(cstring, length, errors);
@@ -537,6 +546,7 @@ static CYTHON_INLINE PyObject* __Pyx_decode_c_bytes(
          PyObject* (*decode_func)(const char *s, Py_ssize_t size, const char *errors));
 
 /////////////// decode_c_bytes ///////////////
+//@requires: NewEmpty
 //@requires: decode_c_string_utf16
 
 static CYTHON_INLINE PyObject* __Pyx_decode_c_bytes(
@@ -556,7 +566,7 @@ static CYTHON_INLINE PyObject* __Pyx_decode_c_bytes(
         stop = length;
     length = stop - start;
     if (unlikely(length <= 0))
-        return PyUnicode_FromUnicode(NULL, 0);
+        return __Pyx_PyUnicode_NewEmpty();
     cstring += start;
     if (decode_func) {
         return decode_func(cstring, length, errors);
@@ -595,6 +605,7 @@ static CYTHON_INLINE PyObject* __Pyx_PyUnicode_Substring(
             PyObject* text, Py_ssize_t start, Py_ssize_t stop);
 
 /////////////// PyUnicode_Substring ///////////////
+//@requires: NewEmpty
 
 static CYTHON_INLINE PyObject* __Pyx_PyUnicode_Substring(
             PyObject* text, Py_ssize_t start, Py_ssize_t stop) {
@@ -612,7 +623,7 @@ static CYTHON_INLINE PyObject* __Pyx_PyUnicode_Substring(
         stop = length;
     length = stop - start;
     if (length <= 0)
-        return PyUnicode_FromUnicode(NULL, 0);
+        return __Pyx_PyUnicode_NewEmpty();
 #if CYTHON_PEP393_ENABLED
     return PyUnicode_FromKindAndData(PyUnicode_KIND(text),
         PyUnicode_1BYTE_DATA(text) + start*PyUnicode_KIND(text), stop-start);
