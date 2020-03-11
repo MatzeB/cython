@@ -79,26 +79,19 @@ static CYTHON_INLINE PyObject* __Pyx_PyUnicode_FromString(const char*);
 #define __Pyx_PyStr_FromCString(s)     __Pyx_PyStr_FromString((const char*)s)
 #define __Pyx_PyUnicode_FromCString(s) __Pyx_PyUnicode_FromString((const char*)s)
 
+// The limited API has no Py_UNICODE type.
+#if !CYTHON_COMPILING_IN_LIMITED_API
 // There used to be a Py_UNICODE_strlen() in CPython 3.x, but it is deprecated since Py3.3.
-#if CYTHON_COMPILING_IN_LIMITED_API
 static CYTHON_INLINE size_t __Pyx_Py_UNICODE_strlen(const wchar_t *u)
 {
     const wchar_t *u_end = u;
     while (*u_end++) ;
     return (size_t)(u_end - u - 1);
 }
-#else
-static CYTHON_INLINE size_t __Pyx_Py_UNICODE_strlen(const Py_UNICODE *u)
-{
-    const Py_UNICODE *u_end = u;
-    while (*u_end++) ;
-    return (size_t)(u_end - u - 1);
-}
-#endif
-
 #define __Pyx_PyUnicode_FromUnicode(u)       PyUnicode_FromUnicode(u, __Pyx_Py_UNICODE_strlen(u))
 #define __Pyx_PyUnicode_FromUnicodeAndLength PyUnicode_FromUnicode
 #define __Pyx_PyUnicode_AsUnicode            PyUnicode_AsUnicode
+#endif
 
 #define __Pyx_NewRef(obj) (Py_INCREF(obj), obj)
 #define __Pyx_Owned_Py_None(b) __Pyx_NewRef(Py_None)
@@ -556,7 +549,12 @@ static CYTHON_INLINE Py_UCS4 __Pyx_PyUnicode_AsPy_UCS4(PyObject*);
 
 static CYTHON_INLINE Py_UCS4 __Pyx_PyUnicode_AsPy_UCS4(PyObject* x) {
    Py_ssize_t length;
-   #if CYTHON_PEP393_ENABLED
+   #if CYTHON_COMPILING_IN_LIMITED_API
+   length = PyUnicode_GetLength(x);
+   if (likely(length == 1)) {
+       return PyUnicode_ReadChar(x, 0);
+   }
+   #elif CYTHON_PEP393_ENABLED
    length = PyUnicode_GET_LENGTH(x);
    if (likely(length == 1)) {
        return PyUnicode_READ_CHAR(x, 0);
@@ -622,6 +620,9 @@ static CYTHON_INLINE Py_UNICODE __Pyx_PyObject_AsPy_UNICODE(PyObject*);
 
 /////////////// ObjectAsPyUnicode ///////////////
 
+#if CYTHON_COMPILING_IN_LIMITED_API
+#error __Pyx_PyObject_AsPy_UNICODE not available in limited API
+#else
 static CYTHON_INLINE Py_UNICODE __Pyx_PyObject_AsPy_UNICODE(PyObject* x) {
     long ival;
     #if CYTHON_PEP393_ENABLED
@@ -666,6 +667,7 @@ static CYTHON_INLINE Py_UNICODE __Pyx_PyObject_AsPy_UNICODE(PyObject* x) {
     }
     return (Py_UNICODE)ival;
 }
+#endif
 
 
 /////////////// CIntToPy.proto ///////////////

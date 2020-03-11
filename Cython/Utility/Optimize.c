@@ -560,24 +560,68 @@ static CYTHON_INLINE int __Pyx_PySet_Remove(PyObject *set, PyObject *key) {
 
 /////////////// unicode_iter.proto ///////////////
 
+typedef struct {
+#if CYTHON_COMPILING_IN_LIMITED_API
+#define CYTHON_UNICODE_ITERATION_BUFFER_SIZE 48
+    Py_UCS4 small_buffer[CYTHON_UNICODE_ITERATION_BUFFER_SIZE];
+    Py_UCS4 *data;
+#elif CYTHON_PEP393_ENABLED
+    PyUnicode_Kind kind;
+    void *data;
+#else
+    Py_UNICODE *data;
+#endif
+} __Pyx_unicode_iteration_data;
+
 static CYTHON_INLINE int __Pyx_init_unicode_iteration(
-    PyObject* ustring, Py_ssize_t *length, void** data, int *kind); /* proto */
+    PyObject *ustring, Py_ssize_t *length,
+    __Pyx_unicode_iteration_data *data); /* proto */
+static CYTHON_INLINE void __Pyx_free_unicode_iteration_data(
+    __Pyx_unicode_iteration_data *data); /* proto */
+
+#if CYTHON_COMPILING_IN_LIMITED_API
+#define __Pyx_PyUnicode_Iter_Read(d, i) ((d)->data[i])
+#elif CYTHON_PEP393_ENABLED
+#define __Pyx_PyUnicode_Iter_Read(d, i) PyUnicode_READ((d)->kind, (d)->data, (i))
+#else
+#define __Pyx_PyUnicode_Iter_Read(d, i) ((Py_UCS4)((d)->data[i]))
+#endif
 
 /////////////// unicode_iter ///////////////
 
 static CYTHON_INLINE int __Pyx_init_unicode_iteration(
-    PyObject* ustring, Py_ssize_t *length, void** data, int *kind) {
-#if CYTHON_PEP393_ENABLED
+    PyObject *ustring, Py_ssize_t *length, __Pyx_unicode_iteration_data *data) {
+#if CYTHON_COMPILING_IN_LIMITED_API
+    *length = PyUnicode_GetLength(ustring);
+    if (*length <= CYTHON_UNICODE_ITERATION_BUFFER_SIZE) {
+        if (PyUnicode_AsUCS4(ustring, data->small_buffer,
+                             CYTHON_UNICODE_ITERATION_BUFFER_SIZE, 0) == NULL) {
+            return -1;
+        }
+        data->data = data->small_buffer;
+    } else {
+        data->data = PyUnicode_AsUCS4Copy(ustring);
+        if (data->data == NULL) return -1;
+    }
+#elif CYTHON_PEP393_ENABLED
     if (unlikely(__Pyx_PyUnicode_READY(ustring) < 0)) return -1;
-    *kind   = PyUnicode_KIND(ustring);
     *length = PyUnicode_GET_LENGTH(ustring);
-    *data   = PyUnicode_DATA(ustring);
+    data->kind = (PyUnicode_Kind)PyUnicode_KIND(ustring);
+    data->data = PyUnicode_DATA(ustring);
 #else
-    *kind   = 0;
     *length = PyUnicode_GET_SIZE(ustring);
-    *data   = (void*)PyUnicode_AS_UNICODE(ustring);
+    data->data = PyUnicode_AS_UNICODE(ustring);
 #endif
     return 0;
+}
+
+static CYTHON_INLINE void __Pyx_free_unicode_iteration_data(
+    __Pyx_unicode_iteration_data *data) {
+#if CYTHON_COMPILING_IN_LIMITED_API
+    if (data->data != data->small_buffer) {
+       PyMem_Free(data->data);
+    }
+#endif
 }
 
 /////////////// pyobject_as_double.proto ///////////////

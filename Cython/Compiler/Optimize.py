@@ -371,21 +371,23 @@ class IterationTransform(Visitor.EnvTransform):
                     ),
                 reversed = reversed))
 
-    PyUnicode_READ_func_type = PyrexTypes.CFuncType(
-        PyrexTypes.c_py_ucs4_type, [
-            PyrexTypes.CFuncTypeArg("kind", PyrexTypes.c_int_type, None),
-            PyrexTypes.CFuncTypeArg("data", PyrexTypes.c_void_ptr_type, None),
-            PyrexTypes.CFuncTypeArg("index", PyrexTypes.c_py_ssize_t_type, None)
-        ])
-
+    unicode_iteration_data_ptr = PyrexTypes.CPtrType(PyrexTypes.cython_unicode_iteration_data)
     init_unicode_iteration_func_type = PyrexTypes.CFuncType(
         PyrexTypes.c_int_type, [
             PyrexTypes.CFuncTypeArg("s", PyrexTypes.py_object_type, None),
             PyrexTypes.CFuncTypeArg("length", PyrexTypes.c_py_ssize_t_ptr_type, None),
-            PyrexTypes.CFuncTypeArg("data", PyrexTypes.c_void_ptr_ptr_type, None),
-            PyrexTypes.CFuncTypeArg("kind", PyrexTypes.c_int_ptr_type, None)
+            PyrexTypes.CFuncTypeArg("data", unicode_iteration_data_ptr, None),
         ],
         exception_value = '-1')
+    free_unicode_iteration_func_type = PyrexTypes.CFuncType(
+        PyrexTypes.c_void_type, [
+            PyrexTypes.CFuncTypeArg("data", unicode_iteration_data_ptr, None),
+        ])
+    __Pyx_PyUnicode_Iter_Read_func_type = PyrexTypes.CFuncType(
+        PyrexTypes.c_py_ucs4_type, [
+            PyrexTypes.CFuncTypeArg("data", unicode_iteration_data_ptr, None),
+            PyrexTypes.CFuncTypeArg("index", PyrexTypes.c_py_ssize_t_type, None)
+        ])
 
     def _transform_unicode_iteration(self, node, slice_node, reversed=False):
         if slice_node.is_literal:
@@ -424,16 +426,18 @@ class IterationTransform(Visitor.EnvTransform):
         else:
             relation1, relation2 = '<=', '<'
 
-        kind_temp = UtilNodes.TempHandle(PyrexTypes.c_int_type)
-        data_temp = UtilNodes.TempHandle(PyrexTypes.c_void_ptr_type)
+        data_temp = UtilNodes.TempHandle(PyrexTypes.cython_unicode_iteration_data)
         counter_temp = UtilNodes.TempHandle(PyrexTypes.c_py_ssize_t_type)
 
         target_value = ExprNodes.PythonCapiCallNode(
-            slice_node.pos, "__Pyx_PyUnicode_READ",
-            self.PyUnicode_READ_func_type,
-            args = [kind_temp.ref(slice_node.pos),
-                    data_temp.ref(slice_node.pos),
-                    counter_temp.ref(node.target.pos)],
+            slice_node.pos, "__Pyx_PyUnicode_Iter_Read",
+            self.__Pyx_PyUnicode_Iter_Read_func_type,
+            args = [
+                ExprNodes.AmpersandNode(node.target.pos,
+                    operand=data_temp.ref(node.target.pos),
+                    type=self.unicode_iteration_data_ptr),
+                counter_temp.ref(node.target.pos)
+            ],
             is_temp = False,
             )
         if target_value.type != node.target.type:
@@ -465,19 +469,33 @@ class IterationTransform(Visitor.EnvTransform):
                         ExprNodes.AmpersandNode(slice_node.pos, operand=length_temp.ref(slice_node.pos),
                                                 type=PyrexTypes.c_py_ssize_t_ptr_type),
                         ExprNodes.AmpersandNode(slice_node.pos, operand=data_temp.ref(slice_node.pos),
-                                                type=PyrexTypes.c_void_ptr_ptr_type),
-                        ExprNodes.AmpersandNode(slice_node.pos, operand=kind_temp.ref(slice_node.pos),
-                                                type=PyrexTypes.c_int_ptr_type),
+                                                type=self.unicode_iteration_data_ptr),
                         ],
                 is_temp = True,
                 result_is_used = False,
                 utility_code=UtilityCode.load_cached("unicode_iter", "Optimize.c"),
                 ))
+        loop_node_free_data = UtilNodes.ScopeWithCleanupNode(
+            body=loop_node,
+            cleanup=Nodes.ExprStatNode(node.pos,
+                expr=ExprNodes.PythonCapiCallNode(
+                    slice_node.pos, "__Pyx_free_unicode_iteration_data",
+                    self.free_unicode_iteration_func_type,
+                    args = [
+                        ExprNodes.AmpersandNode(node.target.pos,
+                            operand=data_temp.ref(node.target.pos),
+                            type=self.unicode_iteration_data_ptr),
+                    ],
+                    is_temp = False,
+                    )),
+            scope_name="unicode_iteration")
+        body = Nodes.StatListNode(node.pos,
+            stats=[setup_node, loop_node_free_data])
         return UtilNodes.LetNode(
             unpack_temp_node,
             UtilNodes.TempsBlockNode(
-                node.pos, temps=[counter_temp, length_temp, data_temp, kind_temp],
-                body=Nodes.StatListNode(node.pos, stats=[setup_node, loop_node])))
+                node.pos, temps=[counter_temp, length_temp, data_temp],
+                body=body))
 
     def _transform_carray_iteration(self, node, slice_node, reversed=False):
         neg_step = False

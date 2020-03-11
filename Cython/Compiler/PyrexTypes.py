@@ -4203,6 +4203,9 @@ c_pytss_t_type = CPyTSSTType()
 c_py_buffer_type = CStructOrUnionType("Py_buffer", "struct", None, 1, "Py_buffer")
 c_py_buffer_ptr_type = CPtrType(c_py_buffer_type)
 
+# unicode iteration data.
+cython_unicode_iteration_data = CStructOrUnionType("__Pyx_unicode_iteration_data", "struct", None, 1, "__Pyx_unicode_iteration_data")
+
 # Not sure whether the unsigned versions and 'long long' should be in there
 # long long requires C99 and might be slow, and would always get preferred
 # when specialization happens through calling and not indexing

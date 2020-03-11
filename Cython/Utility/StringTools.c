@@ -118,6 +118,12 @@ static CYTHON_INLINE int __Pyx_UnicodeContainsUCS4(PyObject* unicode, Py_UCS4 ch
 
 //////////////////// PyUCS4InUnicode ////////////////////
 
+#if CYTHON_COMPILING_IN_LIMITED_API
+static CYTHON_INLINE int __Pyx_UnicodeContainsUCS4(PyObject* unicode, Py_UCS4 character) {
+    const Py_ssize_t length = PyUnicode_GET_LENGTH(unicode);
+    return PyUnicode_FindChar(unicode, character, 0, length, 1) >= 0;
+}
+#else
 static int __Pyx_PyUnicodeBufferContainsUCS4_SP(Py_UNICODE* buffer, Py_ssize_t length, Py_UCS4 character) {
     /* handle surrogate pairs for Py_UNICODE buffers in 16bit Unicode builds */
     Py_UNICODE high_val, low_val;
@@ -166,6 +172,7 @@ static CYTHON_INLINE int __Pyx_UnicodeContainsUCS4(PyObject* unicode, Py_UCS4 ch
 
     }
 }
+#endif
 
 
 //////////////////// PyUnicodeContains.proto ////////////////////
@@ -624,7 +631,9 @@ static CYTHON_INLINE PyObject* __Pyx_PyUnicode_Substring(
     length = stop - start;
     if (length <= 0)
         return __Pyx_PyUnicode_NewEmpty();
-#if CYTHON_PEP393_ENABLED
+#if CYTHON_COMPILING_IN_LIMITED_API
+    return PyUnicode_Substring(text, start, stop);
+#elif CYTHON_PEP393_ENABLED
     return PyUnicode_FromKindAndData(PyUnicode_KIND(text),
         PyUnicode_1BYTE_DATA(text) + start*PyUnicode_KIND(text), stop-start);
 #else
