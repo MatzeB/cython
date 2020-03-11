@@ -730,27 +730,12 @@ static CYTHON_INLINE int __Pyx_PyObject_SetSlice(PyObject* obj, PyObject* value,
         return result;
     }
 {{if access == 'Get'}}
-#if CYTHON_COMPILING_IN_LIMITED_API
-    {
-        PyObject *obj_type_name = __Pyx_PyType_GetName(Py_TYPE(obj));
-        PyErr_Format(PyExc_TypeError, "'%V' object is unsliceable",
-            obj_type_name, "?");
-        Py_XDECREF(obj_type_name);
-    }
-#else
+#if CYTHON_USE_TYPE_SLOTS
     PyErr_Format(PyExc_TypeError,
         "'%.200s' object is unsliceable", Py_TYPE(obj)->tp_name);
 #endif
 {{else}}
-#if CYTHON_COMPILING_IN_LIMITED_API
-    {
-        PyObject *obj_type_name = __Pyx_PyType_GetName(Py_TYPE(obj));
-        PyErr_Format(PyExc_TypeError,
-            "'%V' object does not support slice %.10s",
-            obj_type_name, "?", value ? "assignment" : "deletion");
-        Py_XDECREF(obj_type_name);
-    }
-#else
+#if CYTHON_USE_TYPE_SLOTS
     PyErr_Format(PyExc_TypeError,
         "'%.200s' object does not support slice %.10s",
         Py_TYPE(obj)->tp_name, value ? "assignment" : "deletion");
