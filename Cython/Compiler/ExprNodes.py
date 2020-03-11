@@ -2769,11 +2769,11 @@ class IteratorNode(ExprNode):
             # makes it visible to the C compiler that the pointer really isn't NULL, so that
             # it can distinguish between the special cases and the generic case
             code.putln("#if CYTHON_USE_TYPE_SLOTS")
-            code.putln("%s = PyIter_Next;" % (self.iter_func_ptr,))
-            code.putln("#else")
             code.putln("%s = Py_TYPE(%s)->tp_iternext; %s" % (
                 self.iter_func_ptr, self.py_result(),
                 code.error_goto_if_null(self.iter_func_ptr, self.pos)))
+            code.putln("#else")
+            code.putln("%s = PyIter_Next;" % (self.iter_func_ptr,))
             code.putln("#endif")
         if self.may_be_a_sequence:
             code.putln("}")
