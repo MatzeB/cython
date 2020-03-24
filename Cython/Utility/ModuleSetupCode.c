@@ -279,6 +279,10 @@
   #define __has_cpp_attribute(x) 0
 #endif
 
+#ifndef __has_feature
+  #define __has_feature(x) 0
+#endif
+
 // restrict
 #ifndef CYTHON_RESTRICT
   #if defined(__GNUC__)
@@ -1801,9 +1805,9 @@ static void __Pyx_FastGilFuncInit(void) {
 
 /////////////// StaticAssert ///////////////
 
-#if defined(__STDC_VERSION__) && __STDC_VERSION__ >= 201112L || (defined(__has_feature) && __has_feature(c_static_assert))
+#if (defined(__STDC_VERSION__) && __STDC_VERSION__ >= 201112L) || __has_feature(c_static_assert)
   #define __Pyx_static_assert(condition, message) _Static_assert(condition, message)
-#elif (defined(__cplusplus) && __cplusplus >= 201103LL) || (defined(__has_feature) && __has_feature(cxx_static_assert))
+#elif (defined(__cplusplus) && __cplusplus >= 201103LL) || __has_feature(cxx_static_assert)
   #define __Pyx_static_assert(condition, message) static_assert(condition, message)
 #else
   #define __Pyx_static_assert(condition, message) do { char static_assertion_[(condition)?1:-1]; (void)static_assertion_; } while(0)
