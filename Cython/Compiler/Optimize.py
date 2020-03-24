@@ -3662,10 +3662,8 @@ class OptimizeBuiltinCalls(Visitor.NodeRefCleanupMixin,
             PyrexTypes.CFuncTypeArg("obj", Builtin.unicode_type, None),
             ])
 
-    # TODO(T63152985): codecs.getencoder fails for some of these
-    # _special_encodings = ['UTF8', 'UTF16', 'UTF-16LE', 'UTF-16BE', 'Latin1', 'ASCII',
-    #                       'unicode_escape', 'raw_unicode_escape']
-    _special_encodings = ['UTF8']
+    _special_encodings = ['UTF8', 'UTF16', 'UTF-16LE', 'UTF-16BE', 'Latin1', 'ASCII',
+                          'unicode_escape', 'raw_unicode_escape']
 
     _special_codecs = [ (name, codecs.getencoder(name))
                         for name in _special_encodings ]
