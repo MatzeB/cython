@@ -18,8 +18,7 @@ import sys
 
 from .PyrexTypes import CPtrType
 from . import Future
-# TODO(T55176519): Add unicode database
-# from . import Annotate
+from . import Annotate
 from . import Code
 from . import Naming
 from . import Nodes
