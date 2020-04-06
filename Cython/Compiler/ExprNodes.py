@@ -7724,8 +7724,12 @@ class SequenceNode(ExprNode):
         rhs.generate_disposal_code(code)
 
         iternext_func = code.funcstate.allocate_temp(self._func_iternext_type, manage_ref=False)
+        code.putln("#if CYTHON_USE_TYPE_SLOTS")
         code.putln("%s = Py_TYPE(%s)->tp_iternext;" % (
             iternext_func, iterator_temp))
+        code.putln("#else")
+        code.putln("%s = PyIter_Next;" % iternext_func)
+        code.putln("#endif")
 
         unpacking_error_label = code.new_label('unpacking_failed')
         unpack_code = "%s(%s)" % (iternext_func, iterator_temp)
