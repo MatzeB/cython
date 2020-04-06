@@ -1514,8 +1514,6 @@ class ModuleNode(Nodes.Node, Nodes.BlockNode):
         cdealloc_func_entry = scope.lookup_here("__dealloc__")
         if cdealloc_func_entry and not cdealloc_func_entry.is_special:
             cdealloc_func_entry = None
-        if cdealloc_func_entry is None:
-            code.putln("#if !CYTHON_COMPILING_IN_LIMITED_API")
         code.putln(
             "static void %s(PyObject *o) {" % slot_func_cname)
 
@@ -1606,7 +1604,11 @@ class ModuleNode(Nodes.Node, Nodes.BlockNode):
             if tp_dealloc is not None:
                 code.putln("%s(o);" % tp_dealloc)
             elif base_type.is_builtin_type:
+                code.putln("#if CYTHON_USE_TYPE_SLOTS")
                 code.putln("%s->tp_dealloc(o);" % base_type.typeptr_cname)
+                code.putln("#else")
+                code.putln("_Py_Dealloc(o);")
+                code.putln("#endif")
             else:
                 # This is an externally defined type.  Calling through the
                 # cimported base type pointer directly interacts badly with
@@ -1640,7 +1642,11 @@ class ModuleNode(Nodes.Node, Nodes.BlockNode):
                 code.putln("%s[%s++] = %s;" % (
                     freelist_name, freecount_name, type.cast_code("o")))
                 code.putln("} else {")
+            code.putln("#if CYTHON_USE_TYPE_SLOTS")
             code.putln("(*Py_TYPE(o)->tp_free)(o);")
+            code.putln("#else")
+            code.putln("((freefunc)PyType_GetSlot(Py_TYPE(o), Py_tp_free))(o);")
+            code.putln("#endif")
             if freelist_size:
                 code.putln("}")
 
@@ -1649,8 +1655,6 @@ class ModuleNode(Nodes.Node, Nodes.BlockNode):
 
         code.putln(
             "}")
-        if cdealloc_func_entry is None:
-            code.putln("#endif")
 
     def generate_usr_dealloc_call(self, scope, code):
         entry = scope.lookup_here("__dealloc__")
@@ -1807,7 +1811,15 @@ class ModuleNode(Nodes.Node, Nodes.BlockNode):
         code.putln(
             "PyObject *x = PyInt_FromSsize_t(i); if(!x) return 0;")
         code.putln(
+            "#if CYTHON_USE_TYPE_SLOTS")
+        code.putln(
             "r = Py_TYPE(o)->tp_as_mapping->mp_subscript(o, x);")
+        code.putln(
+            "#else")
+        code.putln(
+            "r = PyObject_GetItem(o, x);");
+        code.putln(
+            "#endif")
         code.putln(
             "Py_DECREF(x);")
         code.putln(
@@ -2232,6 +2244,30 @@ class ModuleNode(Nodes.Node, Nodes.BlockNode):
         code.putln(
             "}")
 
+    def generate_slot_specs(self, scope, slot_table, code):
+        has_tp_getattro = False
+        for slot in slot_table:
+            slot_name = slot.slot_name
+            py3 = slot.py3
+            if not py3 or py3 == "<RESERVED>":
+                continue
+            if isinstance(py3, (tuple, list)):
+                slot_name, alt_method = py3
+            elif py3 is not True:
+                raise AssertionError("Unexpected py3 value")
+            if slot_name == "tp_flags":
+                continue
+            if slot_name == "tp_getattro":
+                has_tp_getattro = True
+            if isinstance(slot, TypeSlots.SuiteSlot):
+                has_tp_getattro |= self.generate_slot_specs(scope, slot.sub_slots, code)
+                continue
+            v = slot.spec_slot_value(scope)
+            if v is None:
+                continue
+            code.putln("    {Py_%s, (void *)%s}," % (slot_name, v))
+        return has_tp_getattro
+
     def generate_typeobj_spec(self, modname, entry, code):
         type = entry.type
         scope = type.scope
@@ -2241,28 +2277,7 @@ class ModuleNode(Nodes.Node, Nodes.BlockNode):
             objstruct = "struct %s" % type.objstruct_cname
         classname = scope.class_name.as_c_string_literal()
         code.putln("static PyType_Slot %s_slots[] = {" % type.typeobj_cname)
-        has_tp_getattro = False
-        for slot in TypeSlots.slot_table:
-            if slot.slot_name == "tp_flags":
-                continue
-            if slot.slot_name == "tp_dealloc" and scope.lookup_here("__dealloc__") is None:
-                continue
-            if slot.slot_name == "tp_getattro":
-                has_tp_getattro = True
-            if slot.slot_name == "tp_as_number":
-                slot.generate_substructure_spec(scope, code)
-                continue
-            if slot.slot_name == "tp_as_sequence":
-                slot.generate_substructure_spec(scope, code)
-                continue
-            if slot.slot_name == "tp_as_mapping":
-                slot.generate_substructure_spec(scope, code)
-                continue
-            if slot.slot_name == "tp_as_buffer":  # Can't support tp_as_buffer
-                continue
-            v = TypeSlots.get_slot_by_name(slot.slot_name).spec_slot_value(scope)
-            if v is not None:
-                code.putln("    {Py_%s, (void *)%s}," % (slot.slot_name, v))
+        has_tp_getattro = self.generate_slot_specs(scope, TypeSlots.slot_table, code)
         if not has_tp_getattro:
             code.putln("    {Py_tp_getattro, __Pyx_PyObject_GenericGetAttr},")
         code.putln("    {0, 0},")
