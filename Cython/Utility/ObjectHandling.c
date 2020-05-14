@@ -187,7 +187,7 @@ static PyObject *__Pyx_PyIter_Next2Default(PyObject* defval) {
 static void __Pyx_PyIter_Next_ErrorNoIterator(PyObject *iterator) {
 #if CYTHON_COMPILING_IN_LIMITED_API
     PyObject* iterator_type_name = __Pyx_PyType_GetName(Py_TYPE(iterator));
-    PyErr_Format(PyErr_TypeError,
+    PyErr_Format(PyExc_TypeError,
         "%V object is not an iterator", iterator_type_name, "?");
     Py_XDECREF(iterator_type_name);
 #else
