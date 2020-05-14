@@ -36,17 +36,10 @@ static PyObject* __Pyx_Globals(void) {
 static PyObject* __Pyx_PyExecGlobals(PyObject*);
 
 //////////////////// PyExecGlobals ////////////////////
-//@requires: Globals
 //@requires: PyExec
 
 static PyObject* __Pyx_PyExecGlobals(PyObject* code) {
-    PyObject* result;
-    PyObject* globals = __Pyx_Globals();
-    if (unlikely(!globals))
-        return NULL;
-    result = __Pyx_PyExec2(code, globals);
-    Py_DECREF(globals);
-    return result;
+  return __Pyx_PyExec2(code, Py_None);
 }
 
 //////////////////// PyExec.proto ////////////////////
@@ -55,6 +48,7 @@ static PyObject* __Pyx_PyExec3(PyObject*, PyObject*, PyObject*);
 static CYTHON_INLINE PyObject* __Pyx_PyExec2(PyObject*, PyObject*);
 
 //////////////////// PyExec ////////////////////
+//@requires: Globals
 //@substitute: naming
 
 static CYTHON_INLINE PyObject* __Pyx_PyExec2(PyObject* o, PyObject* globals) {
@@ -67,7 +61,7 @@ static PyObject* __Pyx_PyExec3(PyObject* o, PyObject* globals, PyObject* locals)
     char *code = 0;
 
     if (!globals || globals == Py_None) {
-        globals = $moddict_cname;
+        globals = __Pyx_Globals();
     } else if (!PyDict_Check(globals)) {
         #if CYTHON_COMPILING_IN_LIMITED_API
         PyObject *globals_type_name = __Pyx_PyType_GetName(Py_TYPE(globals));
@@ -84,8 +78,9 @@ static PyObject* __Pyx_PyExec3(PyObject* o, PyObject* globals, PyObject* locals)
         locals = globals;
     }
 
-    if (__Pyx_PyDict_GetItemStr(globals, PYIDENT("__builtins__")) == NULL) {
-        if (PyDict_SetItem(globals, PYIDENT("__builtins__"), PyEval_GetBuiltins()) < 0)
+    if (PyObject_GetItem(globals, PYIDENT("__builtins__")) == NULL) {
+        PyErr_Clear();
+        if (PyObject_SetItem(globals, PYIDENT("__builtins__"), PyEval_GetBuiltins()) < 0)
             goto bad;
     }
 
