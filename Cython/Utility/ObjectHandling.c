@@ -133,7 +133,11 @@ static int __Pyx_unpack_tuple2_generic(PyObject* tuple, PyObject** pvalue1, PyOb
     if (unlikely(!iter)) goto bad;
     if (decref_tuple) { Py_DECREF(tuple); tuple = NULL; }
 
+#if CYTHON_USE_TYPE_SLOTS
     iternext = Py_TYPE(iter)->tp_iternext;
+#else
+    iternext = PyIter_Next;
+#endif
     value1 = iternext(iter); if (unlikely(!value1)) { index = 0; goto unpacking_failed; }
     value2 = iternext(iter); if (unlikely(!value2)) { index = 1; goto unpacking_failed; }
     if (!has_known_size && unlikely(__Pyx_IternextUnpackEndCheck(iternext(iter), 2))) goto bad;
@@ -163,6 +167,7 @@ static CYTHON_INLINE PyObject *__Pyx_PyIter_Next2(PyObject *, PyObject *); /*pro
 /////////////// IterNext ///////////////
 //@requires: Exceptions.c::PyThreadStateGet
 //@requires: Exceptions.c::PyErrFetchRestore
+//@requires: ObjectHandling.c::PyObjectLookupSpecial
 
 static PyObject *__Pyx_PyIter_Next2Default(PyObject* defval) {
     PyObject* exc_type;
@@ -184,50 +189,53 @@ static PyObject *__Pyx_PyIter_Next2Default(PyObject* defval) {
     return NULL;
 }
 
-static void __Pyx_PyIter_Next_ErrorNoIterator(PyObject *iterator) {
+// PyIter_Check is broken in CPython when the Limited API is enabled (see
+// https://bugs.python.org/issue40704). Provide a work around.
 #if CYTHON_COMPILING_IN_LIMITED_API
-    PyObject* iterator_type_name = __Pyx_PyType_GetName(Py_TYPE(iterator));
-    PyErr_Format(PyExc_TypeError,
-        "%V object is not an iterator", iterator_type_name, "?");
-    Py_XDECREF(iterator_type_name);
-#else
-    PyErr_Format(PyExc_TypeError,
-        "%.200s object is not an iterator", Py_TYPE(iterator)->tp_name);
-#endif
+static int __Pyx_PyIter_Check(PyObject *object)
+{
+    if (__Pyx_PyObject_LookupSpecial(object, PYIDENT("__next__")) == NULL) {
+        PyErr_Clear();
+        return 0;
+    }
+    return 1;
 }
+#else
+#define __Pyx_PyIter_Check(op) PyIter_Check(op)
+#endif
 
 // originally copied from Py3's builtin_next()
 static CYTHON_INLINE PyObject *__Pyx_PyIter_Next2(PyObject* iterator, PyObject* defval) {
     PyObject* next;
     // We always do a quick slot check because calling PyIter_Check() is so wasteful.
+#if CYTHON_USE_TYPE_SLOTS
     iternextfunc iternext = Py_TYPE(iterator)->tp_iternext;
     if (likely(iternext)) {
-#if CYTHON_USE_TYPE_SLOTS
         next = iternext(iterator);
         if (likely(next))
             return next;
         if (unlikely(iternext == &_PyObject_NextNotImplemented))
             return NULL;
-#else
-        // Since the slot was set, assume that PyIter_Next() will likely succeed, and properly fail otherwise.
-        // Note: PyIter_Next() crashes in CPython if "tp_iternext" is NULL.
-        next = PyIter_Next(iterator);
-        if (likely(next))
-            return next;
-#endif
-    } else if (CYTHON_USE_TYPE_SLOTS || unlikely(!PyIter_Check(iterator))) {
-        // If CYTHON_USE_TYPE_SLOTS, then the slot was not set and we don't have an iterable.
-        // Otherwise, don't trust "tp_iternext" and rely on PyIter_Check().
-        __Pyx_PyIter_Next_ErrorNoIterator(iterator);
+    } else {
+        // The slot was not set and we don't have an iterable.
+        PyErr_Format(PyExc_TypeError,
+            "%s object is not an iterator", Py_TYPE(iterator)->tp_name);
         return NULL;
     }
-#if !CYTHON_USE_TYPE_SLOTS
-    else {
-        // We have an iterator with an empty "tp_iternext", but didn't call next() on it yet.
-        next = PyIter_Next(iterator);
-        if (likely(next))
-            return next;
+#else
+    // Note: PyIter_Next() crashes in CPython if "tp_iternext" is NULL.
+    if (unlikely(!__Pyx_PyIter_Check(iterator))) {
+        // The slot was not set and we don't have an iterator.
+        PyObject *tp_name = __Pyx_PyType_GetName(Py_TYPE(iterator));
+        PyErr_Format(PyExc_TypeError, "'%V' object is not an iterator",
+                     tp_name, "?");
+        Py_XDECREF(tp_name);
+        return NULL;
     }
+    // Since the slot was set, assume that PyIter_Next() will likely succeed, and return the default otherwise.
+    next = PyIter_Next(iterator);
+    if (likely(next))
+        return next;
 #endif
     return __Pyx_PyIter_Next2Default(defval);
 }
