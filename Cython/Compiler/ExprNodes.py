@@ -2269,6 +2269,35 @@ class NameNode(AtomicExprNode):
             if null_code and raise_unbound and (entry.type.is_pyobject or memslice_check):
                 code.put_error_if_unbound(self.pos, entry, self.in_nogil_context)
 
+    def generate_module_assignment_code(self, rhs, code):
+        interned_cname = code.intern_identifier(self.entry.name)
+        code.putln("#if CYTHON_COMPILING_IN_LIMITED_API")
+        code.put_incref(rhs.py_result(), py_object_type)
+        code.put_error_if_neg(self.pos, '%s(%s, %s, %s)' % (
+            "PyModule_AddObject",
+            Naming.module_cname,
+            code.get_string_const(self.entry.name),
+            rhs.py_result()))
+        code.putln("#else")
+        code.put_error_if_neg(
+            self.pos,
+            'PyDict_SetItem(%s, %s, %s)' % (
+                Naming.moddict_cname,
+                interned_cname,
+                rhs.py_result()))
+        code.putln("#endif")
+
+    def generate_generic_assignment_code(self, rhs, code, setter, namespace):
+        interned_cname = code.intern_identifier(self.entry.name)
+        code.put_error_if_neg(
+            self.pos,
+            '%s(%s, %s, %s)' % (
+                setter,
+                namespace,
+                interned_cname,
+                rhs.py_result()))
+
+
     def generate_assignment_code(self, rhs, code, overloaded_assignment=False,
         exception_check=None, exception_value=None):
         #print "NameNode.generate_assignment_code:", self.name ###
@@ -2284,39 +2313,25 @@ class NameNode(AtomicExprNode):
         # We use this to access class->tp_dict if necessary.
         if entry.is_pyglobal:
             assert entry.type.is_pyobject, "Python global or builtin not a Python object"
-            interned_cname = code.intern_identifier(self.entry.name)
-            namespace = self.entry.scope.namespace_cname
             if entry.is_member:
                 # if the entry is a member we have to cheat: SetAttr does not work
                 # on types, so we create a descriptor which is then added to tp_dict
                 setter = 'PyDict_SetItem'
-                namespace = '%s->tp_dict' % namespace
+                namespace = '%s->tp_dict' % self.entry.scope.namespace_cname
+                self.generate_generic_assignment_code(rhs, code, setter,
+                                                      namespace)
             elif entry.scope.is_module_scope:
-                setter = 'PyDict_SetItem'
-                namespace = Naming.moddict_cname
+                self.generate_module_assignment_code(rhs, code)
             elif entry.is_pyclass_attr:
                 # Special-case setting __new__
                 n = "SetNewInClass" if self.name == "__new__" else "SetNameInClass"
                 code.globalstate.use_utility_code(UtilityCode.load_cached(n, "ObjectHandling.c"))
                 setter = '__Pyx_' + n
+                namespace = self.entry.scope.namespace_cname
+                self.generate_generic_assignment_code(rhs, code, setter,
+                                                      namespace)
             else:
                 assert False, repr(entry)
-            code.putln("#if CYTHON_COMPILING_IN_LIMITED_API")
-            code.put_incref(rhs.py_result(), py_object_type)
-            code.put_error_if_neg(self.pos, '%s(%s, %s, %s)' % (
-              "PyModule_AddObject",
-              Naming.module_cname,
-              code.get_string_const(self.entry.name),
-              rhs.py_result()))
-            code.putln("#else")
-            code.put_error_if_neg(
-                self.pos,
-                '%s(%s, %s, %s)' % (
-                    setter,
-                    namespace,
-                    interned_cname,
-                    rhs.py_result()))
-            code.putln("#endif")
             if debug_disposal_code:
                 print("NameNode.generate_assignment_code:")
                 print("...generating disposal code for %s" % rhs)
