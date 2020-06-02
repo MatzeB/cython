@@ -35,6 +35,16 @@ from .StringEncoding import EncodedString, encoded_string_or_bytes_literal
 from .Pythran import has_np_pythran
 
 
+extension_types = (
+    'AsyncGen',
+    'Coroutine',
+    'CyFunction',
+    'FusedFunction',
+    'Generator',
+    'StopAsyncIteration',
+)
+
+
 def replace_suffix_encoded(path, newsuf):
     # calls replace suffix and returns a EncodedString or BytesLiteral with the encoding set
     newpath = replace_suffix(path, newsuf)
@@ -2476,12 +2486,10 @@ class ModuleNode(Nodes.Node, Nodes.BlockNode):
         code.putln('int %s;' % Naming.lineno_cname)
         code.putln('int %s;' % Naming.clineno_cname)
         code.putln('const char *%s;' % Naming.filename_cname)
-        code.putln('#ifdef __Pyx_CyFunction_USED')
-        code.putln('PyObject *%s;' % Naming.cyfunction_type_cname)
-        code.putln('#endif')
-        code.putln('#ifdef __Pyx_FusedFunction_USED')
-        code.putln('PyObject *%s;' % Naming.fusedfunction_type_cname)
-        code.putln('#endif')
+        for ext_type in extension_types:
+            code.putln('#ifdef __Pyx_%s_USED' % ext_type)
+            code.putln('PyObject *%s;' % Naming.extension_types[ext_type])
+            code.putln('#endif')
 
     def generate_module_state_end(self, env, modules, globalstate):
         module_state = globalstate['module_state']
@@ -2558,18 +2566,13 @@ class ModuleNode(Nodes.Node, Nodes.BlockNode):
             Naming.filename_cname,
             Naming.modulestateglobal_cname,
             Naming.filename_cname))
-        code.putln('#ifdef __Pyx_CyFunction_USED')
-        code.putln('#define %s %s->%s' % (
-            Naming.cyfunction_type_cname,
-            Naming.modulestateglobal_cname,
-            Naming.cyfunction_type_cname))
-        code.putln('#endif')
-        code.putln('#ifdef __Pyx_FusedFunction_USED')
-        code.putln('#define %s %s->%s' %
-            (Naming.fusedfunction_type_cname,
-            Naming.modulestateglobal_cname,
-            Naming.fusedfunction_type_cname))
-        code.putln('#endif')
+        for ext_type in extension_types:
+            code.putln('#ifdef __Pyx_%s_USED' % ext_type)
+            code.putln('#define %s %s->%s' % (
+                Naming.extension_types[ext_type],
+                Naming.modulestateglobal_cname,
+                Naming.extension_types[ext_type]))
+            code.putln('#endif')
 
     def generate_module_state_clear(self, env, code):
         code.putln("#if CYTHON_COMPILING_IN_LIMITED_API")
@@ -2588,14 +2591,11 @@ class ModuleNode(Nodes.Node, Nodes.BlockNode):
             Naming.empty_bytes)
         code.putln('Py_CLEAR(clear_module_state->%s);' %
             Naming.empty_unicode)
-        code.putln('#ifdef __Pyx_CyFunction_USED')
-        code.putln('Py_CLEAR(clear_module_state->%s);' %
-            Naming.cyfunction_type_cname)
-        code.putln('#endif')
-        code.putln('#ifdef __Pyx_FusedFunction_USED')
-        code.putln('Py_CLEAR(clear_module_state->%s);' %
-            Naming.fusedfunction_type_cname)
-        code.putln('#endif')
+        for ext_type in extension_types:
+            code.putln('#ifdef __Pyx_%s_USED' % ext_type)
+            code.putln('Py_CLEAR(clear_module_state->%s);' %
+                Naming.extension_types[ext_type])
+            code.putln('#endif')
 
     def generate_module_state_traverse(self, env, code):
         code.putln("#if CYTHON_COMPILING_IN_LIMITED_API")
@@ -2614,14 +2614,11 @@ class ModuleNode(Nodes.Node, Nodes.BlockNode):
             Naming.empty_bytes)
         code.putln('Py_VISIT(traverse_module_state->%s);' %
             Naming.empty_unicode)
-        code.putln('#ifdef __Pyx_CyFunction_USED')
-        code.putln('Py_VISIT(traverse_module_state->%s);' %
-            Naming.cyfunction_type_cname)
-        code.putln('#endif')
-        code.putln('#ifdef __Pyx_FusedFunction_USED')
-        code.putln('Py_VISIT(traverse_module_state->%s);' %
-            Naming.fusedfunction_type_cname)
-        code.putln('#endif')
+        for ext_type in extension_types:
+            code.putln('#ifdef __Pyx_%s_USED' % ext_type)
+            code.putln('Py_VISIT(traverse_module_state->%s);' %
+                Naming.extension_types[ext_type])
+            code.putln('#endif')
 
     def generate_module_init_func(self, imported_modules, env, code):
         subfunction = self.mod_init_subfunction(self.scope, code)
@@ -2736,7 +2733,7 @@ class ModuleNode(Nodes.Node, Nodes.BlockNode):
         code.putln("%s = PyUnicode_FromStringAndSize(\"\", 0); %s" % (
             Naming.empty_unicode, code.error_goto_if_null(Naming.empty_unicode, self.pos)))
 
-        for ext_type in ('CyFunction', 'FusedFunction', 'Coroutine', 'Generator', 'AsyncGen', 'StopAsyncIteration'):
+        for ext_type in extension_types:
             code.putln("#ifdef __Pyx_%s_USED" % ext_type)
             code.put_error_if_neg(self.pos, "__pyx_%s_init()" % ext_type)
             code.putln("#endif")
