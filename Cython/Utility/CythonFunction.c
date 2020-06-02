@@ -1,5 +1,3 @@
-
-
 //////////////////// CythonFunction.proto ////////////////////
 #define __Pyx_CyFunction_USED 1
 
@@ -91,7 +89,7 @@ static PyObject * __Pyx_CyFunction_Vectorcall_FASTCALL_KEYWORDS(PyObject *func, 
 //@substitute: naming
 //@requires: CommonStructures.c::FetchCommonType
 //@requires: CommonStructures.c::PyMemberDef
-//@requires: ObjectHandling.c::PyMethodNew
+//@requires: BoundMethod.c::PyMethodNew
 //@requires: ObjectHandling.c::PyVectorcallFastCallDict
 
 static PyObject *

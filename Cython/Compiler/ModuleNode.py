@@ -37,6 +37,7 @@ from .Pythran import has_np_pythran
 
 extension_types = (
     'AsyncGen',
+    'BoundMethod',
     'Coroutine',
     'CyFunction',
     'FusedFunction',
