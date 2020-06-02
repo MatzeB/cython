@@ -136,6 +136,11 @@
   #define CYTHON_USE_EXC_INFO_STACK 0
 
 #elif defined(CYTHON_LIMITED_API)
+  #if !defined(Py_LIMITED_API) || Py_LIMITED_API+0 < 0x03090000
+    // We need support for __dictoffset__ and __weaklistoffset__ in tp_members.
+    #error Must set Py_LIMITED_API to veriosn 3.9 or higher.
+  #endif
+
   #define CYTHON_COMPILING_IN_PYPY 0
   #define CYTHON_COMPILING_IN_PYSTON 0
   #define CYTHON_COMPILING_IN_CPYTHON 0

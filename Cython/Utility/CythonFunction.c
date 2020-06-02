@@ -17,11 +17,18 @@
 
 
 typedef struct {
+#if CYTHON_COMPILING_IN_LIMITED_API
+    PyObject_HEAD
+    PyMethodDef *method_def;
+    PyObject *self;
+    PyObject *module;
+#else
     PyCFunctionObject func;
+#endif
 #if CYTHON_BACKPORT_VECTORCALL
     __pyx_vectorcallfunc func_vectorcall;
 #endif
-#if PY_VERSION_HEX < 0x030500A0
+#if PY_VERSION_HEX < 0x030500A0 || CYTHON_COMPILING_IN_LIMITED_API
     PyObject *func_weakreflist;
 #endif
     PyObject *func_dict;
@@ -49,6 +56,22 @@ typedef struct {
 #if !CYTHON_COMPILING_IN_LIMITED_API
 static PyTypeObject *__pyx_CyFunctionType = 0;
 #endif
+
+#if CYTHON_COMPILING_IN_LIMITED_API
+#define __Pyx_CyFunction_method_def(cyfunc) ((cyfunc)->method_def)
+#define __Pyx_CyFunction_self(cyfunc) ((cyfunc)->self)
+#define __Pyx_CyFunction_module(cyfunc) ((cyfunc)->module)
+#else
+#define __Pyx_CyFunction_method_def(cyfunc) ((cyfunc)->func.m_ml)
+#define __Pyx_CyFunction_self(cyfunc) ((cyfunc)->func.m_self)
+#define __Pyx_CyFunction_module(cyfunc) ((cyfunc)->func.m_module)
+#endif
+#if PY_VERSION_HEX < 0x030500A0 || CYTHON_COMPILING_IN_LIMITED_API
+#define __Pyx_CyFunction_weakreflist(cyfunc) ((cyfunc)->func_weakreflist)
+#else
+#define __Pyx_CyFunction_weakreflist(cyfunc) ((cyfunc)->func.m_weakreflist)
+#endif
+
 
 #define __Pyx_CyFunction_Check(obj)  (__Pyx_TypeCheck(obj, __pyx_CyFunctionType))
 
@@ -96,11 +119,12 @@ static PyObject *
 __Pyx_CyFunction_get_doc(__pyx_CyFunctionObject *op, CYTHON_UNUSED void *closure)
 {
     if (unlikely(op->func_doc == NULL)) {
-        if (op->func.m_ml->ml_doc) {
+        const char *doc = __Pyx_CyFunction_method_def(op)->ml_doc;
+        if (doc != NULL) {
 #if PY_MAJOR_VERSION >= 3
-            op->func_doc = PyUnicode_FromString(op->func.m_ml->ml_doc);
+            op->func_doc = PyUnicode_FromString(doc);
 #else
-            op->func_doc = PyString_FromString(op->func.m_ml->ml_doc);
+            op->func_doc = PyString_FromString(doc);
 #endif
             if (unlikely(op->func_doc == NULL))
                 return NULL;
@@ -131,10 +155,11 @@ static PyObject *
 __Pyx_CyFunction_get_name(__pyx_CyFunctionObject *op, CYTHON_UNUSED void *context)
 {
     if (unlikely(op->func_name == NULL)) {
+        const char* name = __Pyx_CyFunction_method_def(op)->ml_name;
 #if PY_MAJOR_VERSION >= 3
-        op->func_name = PyUnicode_InternFromString(op->func.m_ml->ml_name);
+        op->func_name = PyUnicode_InternFromString(name);
 #else
-        op->func_name = PyString_InternFromString(op->func.m_ml->ml_name);
+        op->func_name = PyString_InternFromString(name);
 #endif
         if (unlikely(op->func_name == NULL))
             return NULL;
@@ -433,14 +458,14 @@ static PyGetSetDef __pyx_CyFunction_getsets[] = {
 };
 
 static PyMemberDef __pyx_CyFunction_members[] = {
-    {(char *) "__module__", T_OBJECT, offsetof(PyCFunctionObject, m_module), PY_WRITE_RESTRICTED, 0},
 #if CYTHON_COMPILING_IN_LIMITED_API
-    {(char *) "__dictoffset__", T_PYSSIZET, offsetof(__pyx_CyFunctionObject, func_dict), READONLY, 0},
-#if PY_VERSION_HEX < 0x030500A0
+    {(char *) "__dictoffset__", T_PYSSIZET,
+     offsetof(__pyx_CyFunctionObject, func_dict), READONLY, 0},
+    {(char *) "__module__", T_OBJECT, offsetof(__pyx_CyFunctionObject, module),
+     PY_WRITE_RESTRICTED, 0},
     {(char *) "__weaklistoffset__", T_PYSSIZET, offsetof(__pyx_CyFunctionObject, func_weakreflist), READONLY, 0},
 #else
-    {(char *) "__weaklistoffset__", T_PYSSIZET, offsetof(PyCFunctionObject, m_weakreflist), READONLY, 0},
-#endif
+    {(char *) "__module__", T_OBJECT, offsetof(PyCFunctionObject, m_module), PY_WRITE_RESTRICTED, 0},
 #endif
     {0, 0, 0,  0, 0}
 };
@@ -452,7 +477,7 @@ __Pyx_CyFunction_reduce(__pyx_CyFunctionObject *m, CYTHON_UNUSED PyObject *args)
     Py_INCREF(m->func_qualname);
     return m->func_qualname;
 #else
-    return PyString_FromString(m->func.m_ml->ml_name);
+    return PyString_FromString(__Pyx_CyFunction_method_def(m)->ml_name);
 #endif
 }
 
@@ -462,13 +487,6 @@ static PyMethodDef __pyx_CyFunction_methods[] = {
 };
 
 
-#if PY_VERSION_HEX < 0x030500A0
-#define __Pyx_CyFunction_weakreflist(cyfunc) ((cyfunc)->func_weakreflist)
-#else
-#define __Pyx_CyFunction_weakreflist(cyfunc) ((cyfunc)->func.m_weakreflist)
-#endif
-
-
 static PyObject *__Pyx_CyFunction_New(PyTypeObject *type, PyMethodDef *ml, int flags, PyObject* qualname,
                                       PyObject *closure, PyObject *module, PyObject* globals, PyObject* code) {
     __pyx_CyFunctionObject *op = PyObject_GC_New(__pyx_CyFunctionObject, type);
@@ -476,12 +494,13 @@ static PyObject *__Pyx_CyFunction_New(PyTypeObject *type, PyMethodDef *ml, int f
         return NULL;
     op->flags = flags;
     __Pyx_CyFunction_weakreflist(op) = NULL;
-    op->func.m_ml = ml;
-    op->func.m_self = (PyObject *) op;
+
+    __Pyx_CyFunction_method_def(op) = ml;
+    __Pyx_CyFunction_self(op) = (PyObject *)op;
+    Py_XINCREF(module);
+    __Pyx_CyFunction_module(op) = module;
     Py_XINCREF(closure);
     op->func_closure = closure;
-    Py_XINCREF(module);
-    op->func.m_module = module;
     op->func_dict = NULL;
     op->func_name = NULL;
     Py_INCREF(qualname);
@@ -528,7 +547,8 @@ static int
 __Pyx_CyFunction_clear(__pyx_CyFunctionObject *m)
 {
     Py_CLEAR(m->func_closure);
-    Py_CLEAR(m->func.m_module);
+    Py_CLEAR(__Pyx_CyFunction_self(m));
+    Py_CLEAR(__Pyx_CyFunction_module(m));
     Py_CLEAR(m->func_dict);
     Py_CLEAR(m->func_name);
     Py_CLEAR(m->func_qualname);
@@ -571,7 +591,8 @@ static void __Pyx_CyFunction_dealloc(__pyx_CyFunctionObject *m)
 static int __Pyx_CyFunction_traverse(__pyx_CyFunctionObject *m, visitproc visit, void *arg)
 {
     Py_VISIT(m->func_closure);
-    Py_VISIT(m->func.m_module);
+    Py_VISIT(__Pyx_CyFunction_self(m));
+    Py_VISIT(__Pyx_CyFunction_module(m));
     Py_VISIT(m->func_dict);
     Py_VISIT(m->func_name);
     Py_VISIT(m->func_qualname);
@@ -605,13 +626,13 @@ __Pyx_CyFunction_repr(__pyx_CyFunctionObject *op)
 #endif
 }
 
-static PyObject * __Pyx_CyFunction_CallMethod(PyObject *func, PyObject *self, PyObject *arg, PyObject *kw) {
+static PyObject * __Pyx_CyFunction_CallMethod(__pyx_CyFunctionObject *func, PyObject *self, PyObject *arg, PyObject *kw) {
     // originally copied from PyCFunction_Call() in CPython's Objects/methodobject.c
-    PyCFunctionObject* f = (PyCFunctionObject*)func;
-    PyCFunction meth = f->m_ml->ml_meth;
+    PyMethodDef *def = __Pyx_CyFunction_method_def(func);
+    PyCFunction meth = def->ml_meth;
     Py_ssize_t size;
 
-    switch (f->m_ml->ml_flags & (METH_VARARGS | METH_KEYWORDS | METH_NOARGS | METH_O)) {
+    switch (def->ml_flags & (METH_VARARGS | METH_KEYWORDS | METH_NOARGS | METH_O)) {
     case METH_VARARGS:
         if (likely(kw == NULL || PyDict_Size(kw) == 0))
             return (*meth)(self, arg);
@@ -625,7 +646,7 @@ static PyObject * __Pyx_CyFunction_CallMethod(PyObject *func, PyObject *self, Py
                 return (*meth)(self, NULL);
             PyErr_Format(PyExc_TypeError,
                 "%.200s() takes no arguments (%" CYTHON_FORMAT_SSIZE_T "d given)",
-                f->m_ml->ml_name, size);
+                def->ml_name, size);
             return NULL;
         }
         break;
@@ -647,7 +668,7 @@ static PyObject * __Pyx_CyFunction_CallMethod(PyObject *func, PyObject *self, Py
             }
             PyErr_Format(PyExc_TypeError,
                 "%.200s() takes exactly one argument (%" CYTHON_FORMAT_SSIZE_T "d given)",
-                f->m_ml->ml_name, size);
+                def->ml_name, size);
             return NULL;
         }
         break;
@@ -656,12 +677,13 @@ static PyObject * __Pyx_CyFunction_CallMethod(PyObject *func, PyObject *self, Py
         return NULL;
     }
     PyErr_Format(PyExc_TypeError, "%.200s() takes no keyword arguments",
-                 f->m_ml->ml_name);
+                 def->ml_name);
     return NULL;
 }
 
-static CYTHON_INLINE PyObject *__Pyx_CyFunction_Call(PyObject *func, PyObject *arg, PyObject *kw) {
-    return __Pyx_CyFunction_CallMethod(func, ((PyCFunctionObject*)func)->m_self, arg, kw);
+static CYTHON_INLINE PyObject *__Pyx_CyFunction_Call(__pyx_CyFunctionObject *func, PyObject *arg, PyObject *kw) {
+    PyObject *self = __Pyx_CyFunction_self(func);
+    return __Pyx_CyFunction_CallMethod(func, self, arg, kw);
 }
 
 static PyObject *__Pyx_CyFunction_CallAsMethod(PyObject *func, PyObject *args, PyObject *kw) {
@@ -694,10 +716,10 @@ static PyObject *__Pyx_CyFunction_CallAsMethod(PyObject *func, PyObject *args, P
             return NULL;
         }
 
-        result = __Pyx_CyFunction_CallMethod(func, self, new_args, kw);
+        result = __Pyx_CyFunction_CallMethod(cyfunc, self, new_args, kw);
         Py_DECREF(new_args);
     } else {
-        result = __Pyx_CyFunction_Call(func, args, kw);
+        result = __Pyx_CyFunction_Call(cyfunc, args, kw);
     }
     return result;
 }
@@ -715,14 +737,15 @@ static CYTHON_INLINE int __Pyx_CyFunction_Vectorcall_CheckArgs(__pyx_CyFunctionO
     if ((cyfunc->flags & __Pyx_CYFUNCTION_CCLASS) && !(cyfunc->flags & __Pyx_CYFUNCTION_STATICMETHOD)) {
         if (unlikely(nargs < 1)) {
             PyErr_Format(PyExc_TypeError, "%.200s() needs an argument",
-                         cyfunc->func.m_ml->ml_name);
+                         __Pyx_CyFunction_method_def(cyfunc)->ml_name);
             return -1;
         }
         ret = 1;
     }
     if (unlikely(kwnames) && PyTuple_GET_SIZE(kwnames)) {
         PyErr_Format(PyExc_TypeError,
-                     "%.200s() takes no keyword arguments", cyfunc->func.m_ml->ml_name);
+                     "%.200s() takes no keyword arguments",
+                     __Pyx_CyFunction_method_def(cyfunc)->ml_name);
         return -1;
     }
     return ret;
@@ -731,7 +754,7 @@ static CYTHON_INLINE int __Pyx_CyFunction_Vectorcall_CheckArgs(__pyx_CyFunctionO
 static PyObject * __Pyx_CyFunction_Vectorcall_NOARGS(PyObject *func, PyObject *const *args, size_t nargsf, PyObject *kwnames)
 {
     __pyx_CyFunctionObject *cyfunc = (__pyx_CyFunctionObject *)func;
-    PyMethodDef* def = cyfunc->func.m_ml;
+    PyMethodDef *def = __Pyx_CyFunction_method_def(cyfunc);
 #if CYTHON_BACKPORT_VECTORCALL
     Py_ssize_t nargs = (Py_ssize_t)nargsf;
 #else
@@ -745,7 +768,7 @@ static PyObject * __Pyx_CyFunction_Vectorcall_NOARGS(PyObject *func, PyObject *c
         nargs -= 1;
         break;
     case 0:
-        self = cyfunc->func.m_self;
+        self = __Pyx_CyFunction_self(cyfunc);
         break;
     default:
         return NULL;
@@ -763,7 +786,7 @@ static PyObject * __Pyx_CyFunction_Vectorcall_NOARGS(PyObject *func, PyObject *c
 static PyObject * __Pyx_CyFunction_Vectorcall_O(PyObject *func, PyObject *const *args, size_t nargsf, PyObject *kwnames)
 {
     __pyx_CyFunctionObject *cyfunc = (__pyx_CyFunctionObject *)func;
-    PyMethodDef* def = cyfunc->func.m_ml;
+    PyMethodDef *def = __Pyx_CyFunction_method_def(cyfunc);
 #if CYTHON_BACKPORT_VECTORCALL
     Py_ssize_t nargs = (Py_ssize_t)nargsf;
 #else
@@ -777,7 +800,7 @@ static PyObject * __Pyx_CyFunction_Vectorcall_O(PyObject *func, PyObject *const 
         nargs -= 1;
         break;
     case 0:
-        self = cyfunc->func.m_self;
+        self = __Pyx_CyFunction_self(cyfunc);
         break;
     default:
         return NULL;
@@ -795,7 +818,7 @@ static PyObject * __Pyx_CyFunction_Vectorcall_O(PyObject *func, PyObject *const 
 static PyObject * __Pyx_CyFunction_Vectorcall_FASTCALL_KEYWORDS(PyObject *func, PyObject *const *args, size_t nargsf, PyObject *kwnames)
 {
     __pyx_CyFunctionObject *cyfunc = (__pyx_CyFunctionObject *)func;
-    PyMethodDef* def = cyfunc->func.m_ml;
+    PyMethodDef *def = __Pyx_CyFunction_method_def(cyfunc);
 #if CYTHON_BACKPORT_VECTORCALL
     Py_ssize_t nargs = (Py_ssize_t)nargsf;
 #else
@@ -809,7 +832,7 @@ static PyObject * __Pyx_CyFunction_Vectorcall_FASTCALL_KEYWORDS(PyObject *func, 
         nargs -= 1;
         break;
     case 0:
-        self = cyfunc->func.m_self;
+        self = __Pyx_CyFunction_self(cyfunc);
         break;
     default:
         return NULL;
@@ -824,12 +847,12 @@ static PyType_Slot __pyx_CyFunctionType_slots[] = {
     {Py_tp_dealloc, (void *)__Pyx_CyFunction_dealloc},
     {Py_tp_repr, (void *)__Pyx_CyFunction_repr},
     {Py_tp_call, (void *)__Pyx_CyFunction_CallAsMethod},
-    {Py_tp_traverse, (void *)__Pyx_CyFunction_traverse},
     {Py_tp_clear, (void *)__Pyx_CyFunction_clear},
-    {Py_tp_methods, (void *)__pyx_CyFunction_methods},
-    {Py_tp_members, (void *)__pyx_CyFunction_members},
-    {Py_tp_getset, (void *)__pyx_CyFunction_getsets},
     {Py_tp_descr_get, (void *)__Pyx_PyMethod_New},
+    {Py_tp_getset, (void *)__pyx_CyFunction_getsets},
+    {Py_tp_members, (void *)__pyx_CyFunction_members},
+    {Py_tp_methods, (void *)__pyx_CyFunction_methods},
+    {Py_tp_traverse, (void *)__Pyx_CyFunction_traverse},
     {0, 0},
 };
 
@@ -925,7 +948,8 @@ static PyTypeObject __pyx_CyFunctionType_type = {
 
 static int __pyx_CyFunction_init(void) {
 #if CYTHON_COMPILING_IN_LIMITED_API
-    __pyx_CyFunctionType = __Pyx_FetchCommonTypeFromSpec(&__pyx_CyFunctionType_spec, NULL);
+    __pyx_CyFunctionType =
+        __Pyx_FetchCommonTypeFromSpec(&__pyx_CyFunctionType_spec, NULL);
 #else
     __pyx_CyFunctionType = __Pyx_FetchCommonType(&__pyx_CyFunctionType_type);
 #endif
@@ -1071,6 +1095,7 @@ static PyObject *
 __pyx_FusedFunction_descr_get(PyObject *self, PyObject *obj, PyObject *type)
 {
     __pyx_FusedFunctionObject *func, *meth;
+    __pyx_CyFunctionObject *cyfunc;
 
     func = (__pyx_FusedFunctionObject *) self;
 
@@ -1083,14 +1108,15 @@ __pyx_FusedFunction_descr_get(PyObject *self, PyObject *obj, PyObject *type)
     if (obj == Py_None)
         obj = NULL;
 
+    cyfunc = (__pyx_CyFunctionObject *)func;
     meth = (__pyx_FusedFunctionObject *) __pyx_FusedFunction_NewEx(
-                    ((PyCFunctionObject *) func)->m_ml,
-                    ((__pyx_CyFunctionObject *) func)->flags,
-                    ((__pyx_CyFunctionObject *) func)->func_qualname,
-                    ((__pyx_CyFunctionObject *) func)->func_closure,
-                    ((PyCFunctionObject *) func)->m_module,
-                    ((__pyx_CyFunctionObject *) func)->func_globals,
-                    ((__pyx_CyFunctionObject *) func)->func_code);
+                    __Pyx_CyFunction_method_def(cyfunc),
+                    cyfunc->flags,
+                    cyfunc->func_qualname,
+                    cyfunc->func_closure,
+                    __Pyx_CyFunction_module(cyfunc),
+                    cyfunc->func_globals,
+                    cyfunc->func_code);
     if (!meth)
         return NULL;
 
@@ -1211,7 +1237,7 @@ __pyx_FusedFunction_callfunction(PyObject *func, PyObject *args, PyObject *kw)
     if (cyfunc->flags & __Pyx_CYFUNCTION_CCLASS && !static_specialized) {
         return __Pyx_CyFunction_CallAsMethod(func, args, kw);
     } else {
-        return __Pyx_CyFunction_Call(func, args, kw);
+        return __Pyx_CyFunction_Call(cyfunc, args, kw);
     }
 }
 
@@ -1296,8 +1322,9 @@ __pyx_FusedFunction_call(PyObject *func, PyObject *args, PyObject *kw)
                                kw == NULL ? Py_None : kw,
                                binding_func->func.defaults_tuple);
             if (unlikely(!tup)) goto bad;
+            __pyx_CyFunctionObject *cyfunc = &binding_func->func;
             new_func = (__pyx_FusedFunctionObject *) __Pyx_CyFunction_CallMethod(
-                func, binding_func->__signatures__, tup, NULL);
+                cyfunc, binding_func->__signatures__, tup, NULL);
         } else {
             tup = PyTuple_Pack(4, binding_func->__signatures__, args,
                                kw == NULL ? Py_None : kw,
