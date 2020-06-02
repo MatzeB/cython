@@ -151,3 +151,9 @@ bad:
     Py_DECREF(abi_module);
     return value;
 }
+
+/////////////// PyMemberDef.proto //////////////////
+
+#if PY_VERSION_HEX < 0x030A0000
+#include <structmember.h>
+#endif
