@@ -249,102 +249,6 @@ builtin_function_table = [
 #  type
 #  xrange
 
-builtin_types_table = [
-
-    ("type",    "PyType_Type",     []),
-
-# This conflicts with the C++ bool type, and unfortunately
-# C++ is too liberal about PyObject* <-> bool conversions,
-# resulting in unintuitive runtime behavior and segfaults.
-#    ("bool",    "PyBool_Type",     []),
-
-    ("int",     "PyInt_Type",      []),
-    ("long",    "PyLong_Type",     []),
-    ("float",   "PyFloat_Type",    []),
-
-    ("complex", "PyComplex_Type",  [BuiltinAttribute('cval', field_type_name = 'Py_complex'),
-                                    BuiltinAttribute('real', 'cval.real', field_type = PyrexTypes.c_double_type),
-                                    BuiltinAttribute('imag', 'cval.imag', field_type = PyrexTypes.c_double_type),
-                                    ]),
-
-    ("basestring", "PyBaseString_Type", [
-                                    BuiltinMethod("join",  "TO",   "T", "__Pyx_PyBaseString_Join",
-                                                  utility_code=UtilityCode.load("StringJoin", "StringTools.c")),
-                                    ]),
-    ("bytearray", "PyByteArray_Type", [
-                                    ]),
-    ("bytes",   "PyBytes_Type",    [BuiltinMethod("__contains__",  "TO",   "b", "PySequence_Contains"),
-                                    BuiltinMethod("join",  "TO",   "O", "__Pyx_PyBytes_Join",
-                                                  utility_code=UtilityCode.load("StringJoin", "StringTools.c")),
-                                    ]),
-    ("str",     "PyString_Type",   [BuiltinMethod("__contains__",  "TO",   "b", "PySequence_Contains"),
-                                    BuiltinMethod("join",  "TO",   "O", "__Pyx_PyString_Join",
-                                                  builtin_return_type='basestring',
-                                                  utility_code=UtilityCode.load("StringJoin", "StringTools.c")),
-                                    ]),
-    ("unicode", "PyUnicode_Type",  [BuiltinMethod("__contains__",  "TO",   "b", "PyUnicode_Contains"),
-                                    BuiltinMethod("join",  "TO",   "T", "PyUnicode_Join"),
-                                    ]),
-
-    ("tuple",   "PyTuple_Type",    [BuiltinMethod("__contains__",  "TO",   "b", "PySequence_Contains"),
-                                    ]),
-
-    ("list",    "PyList_Type",     [BuiltinMethod("__contains__",  "TO",   "b", "PySequence_Contains"),
-                                    BuiltinMethod("insert",  "TzO",  "r", "PyList_Insert"),
-                                    BuiltinMethod("reverse", "T",    "r", "PyList_Reverse"),
-                                    BuiltinMethod("append",  "TO",   "r", "__Pyx_PyList_Append",
-                                                  utility_code=UtilityCode.load("ListAppend", "Optimize.c")),
-                                    BuiltinMethod("extend",  "TO",   "r", "__Pyx_PyList_Extend",
-                                                  utility_code=UtilityCode.load("ListExtend", "Optimize.c")),
-                                    ]),
-
-    ("dict",    "PyDict_Type",     [BuiltinMethod("__contains__",  "TO",   "b", "PyDict_Contains"),
-                                    BuiltinMethod("has_key",       "TO",   "b", "PyDict_Contains"),
-                                    BuiltinMethod("items",  "T",   "O", "__Pyx_PyDict_Items",
-                                                  utility_code=UtilityCode.load("py_dict_items", "Builtins.c")),
-                                    BuiltinMethod("keys",   "T",   "O", "__Pyx_PyDict_Keys",
-                                                  utility_code=UtilityCode.load("py_dict_keys", "Builtins.c")),
-                                    BuiltinMethod("values", "T",   "O", "__Pyx_PyDict_Values",
-                                                  utility_code=UtilityCode.load("py_dict_values", "Builtins.c")),
-                                    BuiltinMethod("iteritems",  "T",   "O", "__Pyx_PyDict_IterItems",
-                                                  utility_code=UtilityCode.load("py_dict_iteritems", "Builtins.c")),
-                                    BuiltinMethod("iterkeys",   "T",   "O", "__Pyx_PyDict_IterKeys",
-                                                  utility_code=UtilityCode.load("py_dict_iterkeys", "Builtins.c")),
-                                    BuiltinMethod("itervalues", "T",   "O", "__Pyx_PyDict_IterValues",
-                                                  utility_code=UtilityCode.load("py_dict_itervalues", "Builtins.c")),
-                                    BuiltinMethod("viewitems",  "T",   "O", "__Pyx_PyDict_ViewItems",
-                                                  utility_code=UtilityCode.load("py_dict_viewitems", "Builtins.c")),
-                                    BuiltinMethod("viewkeys",   "T",   "O", "__Pyx_PyDict_ViewKeys",
-                                                  utility_code=UtilityCode.load("py_dict_viewkeys", "Builtins.c")),
-                                    BuiltinMethod("viewvalues", "T",   "O", "__Pyx_PyDict_ViewValues",
-                                                  utility_code=UtilityCode.load("py_dict_viewvalues", "Builtins.c")),
-                                    BuiltinMethod("clear",  "T",   "r", "__Pyx_PyDict_Clear",
-                                                  utility_code=UtilityCode.load("py_dict_clear", "Optimize.c")),
-                                    BuiltinMethod("copy",   "T",   "T", "PyDict_Copy")]),
-
-    ("slice",   "PySlice_Type",    [BuiltinAttribute('start'),
-                                    BuiltinAttribute('stop'),
-                                    BuiltinAttribute('step'),
-                                    ]),
-#    ("file",    "PyFile_Type",     []),  # not in Py3
-
-    ("set",       "PySet_Type",    [BuiltinMethod("__contains__",  "TO",   "b", "PySequence_Contains"),
-                                    BuiltinMethod("clear",   "T",  "r", "PySet_Clear"),
-                                    # discard() and remove() have a special treatment for unhashable values
-                                    BuiltinMethod("discard", "TO", "r", "__Pyx_PySet_Discard",
-                                                  utility_code=UtilityCode.load("py_set_discard", "Optimize.c")),
-                                    BuiltinMethod("remove",  "TO", "r", "__Pyx_PySet_Remove",
-                                                  utility_code=UtilityCode.load("py_set_remove", "Optimize.c")),
-                                    # update is actually variadic (see Github issue #1645)
-#                                    BuiltinMethod("update",     "TO", "r", "__Pyx_PySet_Update",
-#                                                  utility_code=UtilityCode.load_cached("PySet_Update", "Builtins.c")),
-                                    BuiltinMethod("add",     "TO", "r", "PySet_Add"),
-                                    BuiltinMethod("pop",     "T",  "O", "PySet_Pop")]),
-    ("frozenset", "PyFrozenSet_Type", []),
-    ("Exception", "((PyTypeObject*)PyExc_Exception)[0]", []),
-    ("StopAsyncIteration", "((PyTypeObject*)__Pyx_PyExc_StopAsyncIteration)[0]", []),
-]
-
 
 types_that_construct_their_instance = set([
     # some builtin types do not always return an instance of
@@ -390,24 +294,121 @@ builtin_types = {}
 
 def init_builtin_types():
     global builtin_types
-    for name, cname, methods in builtin_types_table:
-        utility = builtin_utility_code.get(name)
-        if name == 'frozenset':
-            objstruct_cname = 'PySetObject'
-        elif name == 'bytearray':
-            objstruct_cname = 'PyByteArrayObject'
-        elif name == 'bool':
-            objstruct_cname = None
-        elif name == 'Exception':
-            objstruct_cname = "PyBaseExceptionObject"
-        elif name == 'StopAsyncIteration':
-            objstruct_cname = "PyBaseExceptionObject"
-        else:
+
+    def t(name, cname=None, ptr_cname=None, attrs=None, objstruct_cname=None):
+        if objstruct_cname is None:
             objstruct_cname = 'Py%sObject' % name.capitalize()
-        the_type = builtin_scope.declare_builtin_type(name, cname, utility, objstruct_cname)
+        if ptr_cname is None:
+            assert cname is not None
+            ptr_cname = "(&%s)" % cname
+        if cname is None:
+            assert ptr_cname is not None
+            cname = "*(%s)" % ptr_cname
+        utility = builtin_utility_code.get(name)
+        the_type = builtin_scope.declare_builtin_type(name, cname,
+                objstruct_cname, ptr_cname, utility)
         builtin_types[name] = the_type
-        for method in methods:
-            method.declare_in_type(the_type)
+        if attrs is not None:
+            for method in attrs:
+                method.declare_in_type(the_type)
+
+    t("type", "PyType_Type")
+    # This conflicts with the C++ bool type, and unfortunately
+    # C++ is too liberal about PyObject* <-> bool conversions,
+    # resulting in unintuitive runtime behavior and segfaults.
+    # t("bool", "PyBool_Type")
+    t("int", "PyInt_Type")
+    t("long", "PyLong_Type")
+    t("float", "PyFloat_Type")
+    t("complex", "PyComplex_Type", attrs=(
+        BuiltinAttribute('cval', field_type_name='Py_complex'),
+        BuiltinAttribute('real', 'cval.real', field_type=PyrexTypes.c_double_type),
+        BuiltinAttribute('imag', 'cval.imag', field_type=PyrexTypes.c_double_type),
+    ))
+    t("basestring", "PyBaseString_Type", attrs=(
+        BuiltinMethod("join", "TO", "T", "__Pyx_PyBaseString_Join",
+            utility_code=UtilityCode.load("StringJoin", "StringTools.c")),
+    ))
+    t("bytearray", "PyByteArray_Type", objstruct_cname="PyByteArrayObject")
+    t("bytes", "PyBytes_Type", attrs=(
+        BuiltinMethod("__contains__", "TO", "b", "PySequence_Contains"),
+        BuiltinMethod("join", "TO", "O", "__Pyx_PyBytes_Join",
+            utility_code=UtilityCode.load("StringJoin", "StringTools.c")),
+    ))
+    t("str", "PyString_Type", attrs=(
+        BuiltinMethod("__contains__", "TO", "b", "PySequence_Contains"),
+        BuiltinMethod("join", "TO", "O", "__Pyx_PyString_Join",
+            builtin_return_type='basestring',
+            utility_code=UtilityCode.load("StringJoin", "StringTools.c")),
+    ))
+    t("unicode", "PyUnicode_Type", attrs=(
+        BuiltinMethod("__contains__", "TO", "b", "PyUnicode_Contains"),
+        BuiltinMethod("join", "TO", "T", "PyUnicode_Join"),
+    ))
+    t("tuple", "PyTuple_Type", attrs=(
+        BuiltinMethod("__contains__", "TO", "b", "PySequence_Contains"),
+    ))
+    t("list", "PyList_Type", attrs=(
+        BuiltinMethod("__contains__", "TO", "b", "PySequence_Contains"),
+        BuiltinMethod("insert", "TzO", "r", "PyList_Insert"),
+        BuiltinMethod("reverse", "T", "r", "PyList_Reverse"),
+        BuiltinMethod("append", "TO", "r", "__Pyx_PyList_Append",
+            utility_code=UtilityCode.load("ListAppend", "Optimize.c")),
+        BuiltinMethod("extend", "TO", "r", "__Pyx_PyList_Extend",
+            utility_code=UtilityCode.load("ListExtend", "Optimize.c")),
+    ))
+    t("dict", "PyDict_Type", attrs=(
+        BuiltinMethod("__contains__", "TO", "b", "PyDict_Contains"),
+        BuiltinMethod("has_key", "TO", "b", "PyDict_Contains"),
+        BuiltinMethod("items", "T", "O", "__Pyx_PyDict_Items",
+            utility_code=UtilityCode.load("py_dict_items", "Builtins.c")),
+        BuiltinMethod("keys", "T", "O", "__Pyx_PyDict_Keys",
+            utility_code=UtilityCode.load("py_dict_keys", "Builtins.c")),
+        BuiltinMethod("values", "T", "O", "__Pyx_PyDict_Values",
+            utility_code=UtilityCode.load("py_dict_values", "Builtins.c")),
+        BuiltinMethod("iteritems", "T", "O", "__Pyx_PyDict_IterItems",
+            utility_code=UtilityCode.load("py_dict_iteritems", "Builtins.c")),
+        BuiltinMethod("iterkeys", "T", "O", "__Pyx_PyDict_IterKeys",
+            utility_code=UtilityCode.load("py_dict_iterkeys", "Builtins.c")),
+        BuiltinMethod("itervalues", "T", "O", "__Pyx_PyDict_IterValues",
+            utility_code=UtilityCode.load("py_dict_itervalues", "Builtins.c")),
+        BuiltinMethod("viewitems", "T", "O", "__Pyx_PyDict_ViewItems",
+            utility_code=UtilityCode.load("py_dict_viewitems", "Builtins.c")),
+        BuiltinMethod("viewkeys", "T", "O", "__Pyx_PyDict_ViewKeys",
+            utility_code=UtilityCode.load("py_dict_viewkeys", "Builtins.c")),
+        BuiltinMethod("viewvalues", "T", "O", "__Pyx_PyDict_ViewValues",
+            utility_code=UtilityCode.load("py_dict_viewvalues", "Builtins.c")),
+        BuiltinMethod("clear", "T", "r", "__Pyx_PyDict_Clear",
+            utility_code=UtilityCode.load("py_dict_clear", "Optimize.c")),
+        BuiltinMethod("copy", "T", "T", "PyDict_Copy"),
+    ))
+    t("slice", "PySlice_Type", attrs=(
+        BuiltinAttribute('start'),
+        BuiltinAttribute('stop'),
+        BuiltinAttribute('step'),
+    ))
+    # t("file", "PyFile_Type"),  # not in Py3
+    t("set", "PySet_Type", attrs=(
+        BuiltinMethod("__contains__", "TO", "b", "PySequence_Contains"),
+        BuiltinMethod("clear", "T", "r", "PySet_Clear"),
+        # discard() and remove() have a special treatment for unhashable values
+        BuiltinMethod("discard", "TO", "r", "__Pyx_PySet_Discard",
+            utility_code=UtilityCode.load("py_set_discard", "Optimize.c")),
+        BuiltinMethod("remove", "TO", "r", "__Pyx_PySet_Remove",
+            utility_code=UtilityCode.load("py_set_remove", "Optimize.c")),
+        # update is actually variadic (see Github issue #1645)
+        # BuiltinMethod("update", "TO", "r", "__Pyx_PySet_Update",
+        #     utility_code=UtilityCode.load_cached("PySet_Update", "Builtins.c")),
+        BuiltinMethod("add", "TO", "r", "PySet_Add"),
+        BuiltinMethod("pop", "T", "O", "PySet_Pop"),
+    ))
+    t("frozenset", "PyFrozenSet_Type", objstruct_cname="PySetObject")
+    t("Exception", ptr_cname="(PyTypeObject*)PyExc_Exception",
+      objstruct_cname="PyBaseExceptionObject")
+    t("StopAsyncIteration",
+      ptr_cname="(PyTypeObject*)__Pyx_PyExc_StopAsyncIteration",
+      objstruct_cname="PyBaseExceptionObject")
+
 
 def init_builtin_structs():
     for name, cname, attribute_types in builtin_structs_table:
