@@ -731,6 +731,9 @@ static PyObject * __Pyx_PyType_GetName(PyTypeObject* tp) {
     }
     return name;
 }
+#define __Pyx_PyType_GetFlags(op) PyType_GetFlags(op)
+#else
+#define __Pyx_PyType_GetFlags(op) ((op)->tp_flags)
 #endif
 
 #if CYTHON_COMPILING_IN_LIMITED_API

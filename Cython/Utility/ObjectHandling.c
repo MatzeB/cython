@@ -2412,7 +2412,7 @@ static PyObject *__Pyx_PyVectorcall_FastCallDict_kw(PyObject *func, __pyx_vector
     pos = i = 0;
     keys_are_strings = Py_TPFLAGS_UNICODE_SUBCLASS;
     while (PyDict_Next(kw, &pos, &key, &value)) {
-        keys_are_strings &= Py_TYPE(key)->tp_flags;
+        keys_are_strings &= __Pyx_PyType_GetFlags(Py_TYPE(key));
         Py_INCREF(key);
         Py_INCREF(value);
         PyTuple_SET_ITEM(kwnames, i, key);
