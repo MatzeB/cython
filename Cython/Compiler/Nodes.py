@@ -4528,9 +4528,15 @@ class OverrideCheckNode(StatNode):
         if self.py_func.is_module_scope:
             code.putln("else {")
         else:
-            code.putln("else if (unlikely((Py_TYPE(%s)->tp_dictoffset != 0)"
-                       " || (__Pyx_PyType_GetFlags(Py_TYPE(%s)) & (Py_TPFLAGS_IS_ABSTRACT | Py_TPFLAGS_HEAPTYPE)))) {" % (
-                self_arg, self_arg))
+            code.putln("else if (")
+            code.putln("#if CYTHON_COMPILING_IN_LIMITED_API")
+            code.putln("    1  // Types are created with PyType_FromSpec and have Py_TPFALGS_HEAPTYPE")
+            code.putln("#else")
+            code.putln("    unlikely(Py_TYPE(%s)->tp_dictoffset != 0 ||" % self_arg)
+            code.putln("             (__Pyx_PyType_GetFlags(Py_TYPE(%s)) &" % self_arg)
+            code.putln("              (Py_TPFLAGS_IS_ABSTRACT | Py_TPFLAGS_HEAPTYPE)))")
+            code.putln("#endif")
+            code.putln(") {")
 
         code.putln("#if CYTHON_USE_DICT_VERSIONS && CYTHON_USE_PYTYPE_LOOKUP && CYTHON_USE_TYPE_SLOTS")
         code.globalstate.use_utility_code(
