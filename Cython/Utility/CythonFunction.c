@@ -1,5 +1,5 @@
 //////////////////// CythonFunction.proto ////////////////////
-#define __Pyx_CyFunction_USED 1
+#define __Pyx_CyFunction_USED
 
 #define __Pyx_CYFUNCTION_STATICMETHOD  0x01
 #define __Pyx_CYFUNCTION_CLASSMETHOD   0x02
@@ -79,28 +79,34 @@ static PyTypeObject *__pyx_CyFunctionType = 0;
     __Pyx_CyFunction_New((PyTypeObject *)__pyx_CyFunctionType, ml, flags, qualname, closure, module, globals, code)
 
 static PyObject *__Pyx_CyFunction_New(PyTypeObject *type, PyMethodDef *ml,
-                                      int flags, PyObject* qualname,
-                                      PyObject *closure,
-                                      PyObject *module, PyObject *globals,
-                                      PyObject* code);
+                                      int flags, PyObject *qualname,
+                                      PyObject *closure, PyObject *module,
+                                      PyObject *globals,
+                                      PyObject *code); /*proto*/
 
-static CYTHON_INLINE void *__Pyx_CyFunction_InitDefaults(PyObject *m,
-                                                         size_t size,
-                                                         int pyobjects);
-static CYTHON_INLINE void __Pyx_CyFunction_SetDefaultsTuple(PyObject *m,
-                                                            PyObject *tuple);
-static CYTHON_INLINE void __Pyx_CyFunction_SetDefaultsKwDict(PyObject *m,
-                                                             PyObject *dict);
-static CYTHON_INLINE void __Pyx_CyFunction_SetAnnotationsDict(PyObject *m,
-                                                              PyObject *dict);
+static CYTHON_INLINE void *
+__Pyx_CyFunction_InitDefaults(PyObject *m, size_t size,
+                              int pyobjects); /*proto*/
+static CYTHON_INLINE void
+__Pyx_CyFunction_SetDefaultsTuple(PyObject *m, PyObject *tuple); /*proto*/
+static CYTHON_INLINE void
+__Pyx_CyFunction_SetDefaultsKwDict(PyObject *m, PyObject *dict); /*proto*/
+static CYTHON_INLINE void
+__Pyx_CyFunction_SetAnnotationsDict(PyObject *m, PyObject *dict); /*proto*/
 
-
-static int __pyx_CyFunction_init(void);
+static int __pyx_CyFunction_init(void); /*proto*/
 
 #if CYTHON_METH_FASTCALL
-static PyObject * __Pyx_CyFunction_Vectorcall_NOARGS(PyObject *func, PyObject *const *args, size_t nargsf, PyObject *kwnames);
-static PyObject * __Pyx_CyFunction_Vectorcall_O(PyObject *func, PyObject *const *args, size_t nargsf, PyObject *kwnames);
-static PyObject * __Pyx_CyFunction_Vectorcall_FASTCALL_KEYWORDS(PyObject *func, PyObject *const *args, size_t nargsf, PyObject *kwnames);
+static PyObject *
+__Pyx_CyFunction_Vectorcall_NOARGS(PyObject *func, PyObject *const *args,
+                                   size_t nargsf, PyObject *kwnames); /*proto*/
+static PyObject *__Pyx_CyFunction_Vectorcall_O(PyObject *func,
+                                               PyObject *const *args,
+                                               size_t nargsf,
+                                               PyObject *kwnames); /*proto*/
+static PyObject *__Pyx_CyFunction_Vectorcall_FASTCALL_KEYWORDS(
+    PyObject *func, PyObject *const *args, size_t nargsf,
+    PyObject *kwnames); /*proto*/
 #if CYTHON_BACKPORT_VECTORCALL
 #define __Pyx_CyFunction_func_vectorcall(f) (((__pyx_CyFunctionObject*)f)->func_vectorcall)
 #else

@@ -1,8 +1,8 @@
 /////////////// BoundMethod.proto ///////////////
 
 #if CYTHON_COMPILING_IN_LIMITED_API
-#define __Pyx_BoundMethod_USED 1
-static int __pyx_BoundMethod_init(void);
+#define __Pyx_BoundMethod_USED
+static int __pyx_BoundMethod_init(void); /*proto*/
 #endif
 
 /////////////// BoundMethod ///////////////
@@ -159,9 +159,10 @@ __Pyx_BoundMethod_hash(__pyx_BoundMethodObject *self)
 static PyMemberDef __pyx_BoundMethod_members[] = {
     {(char *)"__func__", T_OBJECT, offsetof(__pyx_BoundMethodObject, function),
      READONLY,
-     (char *)"the function (or other callable) implementing a method"},
+     (char *)PyDoc_STR(
+         "the function (or other callable) implementing a method")},
     {(char *)"__self__", T_OBJECT, offsetof(__pyx_BoundMethodObject, self),
-     READONLY, (char *)"the instance to which a method is bound"},
+     READONLY, (char *)PyDoc_STR("the instance to which a method is bound")},
     {(char *)"__weaklistoffset__", T_LONG,
      offsetof(__pyx_BoundMethodObject, weakreflist), 0},
     {0, 0, 0, 0, 0},
