@@ -2711,7 +2711,8 @@ class ModuleNode(Nodes.Node, Nodes.BlockNode):
         code.putln("#endif")
 
         code.putln("/*--- Module creation code ---*/")
-        self.generate_module_creation_code(env, code)
+        module_temp = code.funcstate.allocate_temp(py_object_type, manage_ref=True)
+        self.generate_module_creation_code(env, code, module_temp)
 
         if profile or linetrace:
             tempdecl_code.put_trace_declarations()
@@ -2833,6 +2834,7 @@ class ModuleNode(Nodes.Node, Nodes.BlockNode):
         code.put_label(code.error_label)
         for cname, type in code.funcstate.all_managed_temps():
             code.put_xdecref(cname, type)
+        code.putln('%s = NULL;' % module_temp)
         code.putln('if (%s) {' % env.module_cname)
         code.putln("#if !CYTHON_COMPILING_IN_LIMITED_API")
         code.putln('if (%s) {' % env.module_dict_cname)
@@ -2858,6 +2860,9 @@ class ModuleNode(Nodes.Node, Nodes.BlockNode):
 
         code.putln("#if CYTHON_PEP489_MULTI_PHASE_INIT")
         code.putln("return (%s != NULL) ? 0 : -1;" % env.module_cname)
+        code.putln("#elif CYTHON_COMPILING_IN_LIMITED_API")
+        code.putln("return %s;" % module_temp)
+        code.funcstate.release_temp(module_temp)
         code.putln("#elif PY_MAJOR_VERSION >= 3")
         code.putln("return %s;" % env.module_cname)
         code.putln("#else")
@@ -3166,7 +3171,7 @@ class ModuleNode(Nodes.Node, Nodes.BlockNode):
         code.putln('#endif')
         code.putln("#endif")
 
-    def generate_module_creation_code(self, env, code):
+    def generate_module_creation_code(self, env, code, module_temp):
         # Generate code to create the module object and
         # install the builtins.
         if env.doc:
@@ -3189,17 +3194,13 @@ class ModuleNode(Nodes.Node, Nodes.BlockNode):
                 doc,
                 env.module_cname))
         code.putln("#elif CYTHON_COMPILING_IN_LIMITED_API")
-        module_temp = code.funcstate.allocate_temp(py_object_type, manage_ref=True)
         code.putln(
             "%s = PyModule_Create(&%s); %s" % (
                 module_temp,
                 Naming.pymoduledef_cname,
                 code.error_goto_if_null(module_temp, self.pos)))
-        code.put_gotref(module_temp)
         code.putln(code.error_goto_if_neg("PyState_AddModule(%s, &%s)" % (
             module_temp, Naming.pymoduledef_cname), self.pos))
-        code.put_decref_clear(module_temp, type=py_object_type)
-        code.funcstate.release_temp(module_temp)
         code.putln('#else')
         code.putln(
             "%s = PyModule_Create(&%s);" % (
