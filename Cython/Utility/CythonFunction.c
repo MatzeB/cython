@@ -20,7 +20,6 @@ typedef struct {
 #if CYTHON_COMPILING_IN_LIMITED_API
     PyObject_HEAD
     PyMethodDef *method_def;
-    PyObject *self;
     PyObject *module;
 #else
     PyCFunctionObject func;
@@ -59,11 +58,9 @@ static PyTypeObject *__pyx_CyFunctionType = 0;
 
 #if CYTHON_COMPILING_IN_LIMITED_API
 #define __Pyx_CyFunction_method_def(cyfunc) ((cyfunc)->method_def)
-#define __Pyx_CyFunction_self(cyfunc) ((cyfunc)->self)
 #define __Pyx_CyFunction_module(cyfunc) ((cyfunc)->module)
 #else
 #define __Pyx_CyFunction_method_def(cyfunc) ((cyfunc)->func.m_ml)
-#define __Pyx_CyFunction_self(cyfunc) ((cyfunc)->func.m_self)
 #define __Pyx_CyFunction_module(cyfunc) ((cyfunc)->func.m_module)
 #endif
 #if PY_VERSION_HEX < 0x030500A0 || CYTHON_COMPILING_IN_LIMITED_API
@@ -502,7 +499,9 @@ static PyObject *__Pyx_CyFunction_New(PyTypeObject *type, PyMethodDef *ml, int f
     __Pyx_CyFunction_weakreflist(op) = NULL;
 
     __Pyx_CyFunction_method_def(op) = ml;
-    __Pyx_CyFunction_self(op) = (PyObject *)op;
+#if !CYTHON_COMPILING_IN_LIMITED_API
+    op->func.m_self = (PyObject*) op;
+#endif
     Py_XINCREF(module);
     __Pyx_CyFunction_module(op) = module;
     Py_XINCREF(closure);
@@ -553,7 +552,6 @@ static int
 __Pyx_CyFunction_clear(__pyx_CyFunctionObject *m)
 {
     Py_CLEAR(m->func_closure);
-    Py_CLEAR(__Pyx_CyFunction_self(m));
     Py_CLEAR(__Pyx_CyFunction_module(m));
     Py_CLEAR(m->func_dict);
     Py_CLEAR(m->func_name);
@@ -597,7 +595,6 @@ static void __Pyx_CyFunction_dealloc(__pyx_CyFunctionObject *m)
 static int __Pyx_CyFunction_traverse(__pyx_CyFunctionObject *m, visitproc visit, void *arg)
 {
     Py_VISIT(m->func_closure);
-    Py_VISIT(__Pyx_CyFunction_self(m));
     Py_VISIT(__Pyx_CyFunction_module(m));
     Py_VISIT(m->func_dict);
     Py_VISIT(m->func_name);
@@ -688,8 +685,7 @@ static PyObject * __Pyx_CyFunction_CallMethod(__pyx_CyFunctionObject *func, PyOb
 }
 
 static CYTHON_INLINE PyObject *__Pyx_CyFunction_Call(__pyx_CyFunctionObject *func, PyObject *arg, PyObject *kw) {
-    PyObject *self = __Pyx_CyFunction_self(func);
-    return __Pyx_CyFunction_CallMethod(func, self, arg, kw);
+    return __Pyx_CyFunction_CallMethod(func, (PyObject*)func, arg, kw);
 }
 
 static PyObject *__Pyx_CyFunction_CallAsMethod(PyObject *func, PyObject *args, PyObject *kw) {
@@ -774,7 +770,7 @@ static PyObject * __Pyx_CyFunction_Vectorcall_NOARGS(PyObject *func, PyObject *c
         nargs -= 1;
         break;
     case 0:
-        self = __Pyx_CyFunction_self(cyfunc);
+        self = func;
         break;
     default:
         return NULL;
@@ -806,7 +802,7 @@ static PyObject * __Pyx_CyFunction_Vectorcall_O(PyObject *func, PyObject *const 
         nargs -= 1;
         break;
     case 0:
-        self = __Pyx_CyFunction_self(cyfunc);
+        self = func;
         break;
     default:
         return NULL;
@@ -838,7 +834,7 @@ static PyObject * __Pyx_CyFunction_Vectorcall_FASTCALL_KEYWORDS(PyObject *func, 
         nargs -= 1;
         break;
     case 0:
-        self = __Pyx_CyFunction_self(cyfunc);
+        self = func;
         break;
     default:
         return NULL;
