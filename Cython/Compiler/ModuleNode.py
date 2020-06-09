@@ -1321,7 +1321,7 @@ class ModuleNode(Nodes.Node, Nodes.BlockNode):
                     self.generate_method_table(scope, code)
                     self.generate_getset_table(scope, code)
                     code.putln("#if CYTHON_COMPILING_IN_LIMITED_API")
-                    self.generate_typeobj_spec(full_module_name, entry, code)
+                    self.generate_typeobj_spec(env, full_module_name, entry, code)
                     code.putln("#else")
                     self.generate_typeobj_definition(full_module_name, entry, code)
                     code.putln("#endif")
@@ -2243,8 +2243,8 @@ class ModuleNode(Nodes.Node, Nodes.BlockNode):
         code.putln(
             "}")
 
-    def generate_slot_specs(self, scope, slot_table, code):
-        has_tp_getattro = False
+    def find_slots(self, scope, slot_table, code):
+        result = {}
         for slot in slot_table:
             slot_name = slot.slot_name
             py3 = slot.py3
@@ -2254,40 +2254,52 @@ class ModuleNode(Nodes.Node, Nodes.BlockNode):
                 slot_name, alt_method = py3
             elif py3 is not True:
                 raise AssertionError("Unexpected py3 value")
-            if slot_name == "tp_flags":
-                continue
-            if slot_name == "tp_getattro":
-                has_tp_getattro = True
             if isinstance(slot, TypeSlots.SuiteSlot):
-                has_tp_getattro |= self.generate_slot_specs(scope, slot.sub_slots, code)
+                result.update(self.find_slots(scope, slot.sub_slots, code))
                 continue
             v = slot.spec_slot_value(scope)
             if v is None:
                 continue
-            code.putln("    {Py_%s, (void *)%s}," % (slot_name, v))
-        return has_tp_getattro
+            result[slot_name] = v
+        return result
 
-    def generate_typeobj_spec(self, modname, entry, code):
+    def generate_typeobj_spec(self, env, modname, entry, code):
         type = entry.type
         scope = type.scope
         if type.typedef_flag:
             objstruct = type.objstruct_cname
         else:
             objstruct = "struct %s" % type.objstruct_cname
+        typeobj_cname = type.typeobj_cname
+
+        slots = self.find_slots(scope, TypeSlots.slot_table, code)
+        dictoffset = slots.get("tp_dictoffset")
+        if dictoffset is not None:
+            env.use_utility_code(
+                UtilityCode.load_cached("PyMemberDef", "CommonStructures.c")
+            )
+            code.putln("static PyMemberDef %s_members[] = {" % typeobj_cname)
+            code.putln("    {\"__dictoffset__\", T_PYSSIZET,")
+            code.putln("     %s, READONLY, 0}," % dictoffset)
+            code.putln("};")
+            del slots["tp_dictoffset"]
+            assert "tp_members" not in slots
+            slots["tp_members"] = "%s_members" % typeobj_cname
+        flags = slots.pop("tp_flags", 0)
+
         classname = scope.class_name.as_c_string_literal()
-        code.putln("static PyType_Slot %s_slots[] = {" % type.typeobj_cname)
-        has_tp_getattro = self.generate_slot_specs(scope, TypeSlots.slot_table, code)
-        if not has_tp_getattro:
-            code.putln("    {Py_tp_getattro, __Pyx_PyObject_GenericGetAttr},")
+        code.putln("static PyType_Slot %s_slots[] = {" % typeobj_cname)
+        for name, value in sorted(slots.items()):
+            code.putln("    {Py_%s, (void*)%s}," % (name, value))
         code.putln("    {0, 0},")
         code.putln("};")
 
-        code.putln("static PyType_Spec %s_spec = {" % type.typeobj_cname)
+        code.putln("static PyType_Spec %s_spec = {" % typeobj_cname)
         code.putln("    \"%s.%s\"," % (self.full_module_name, classname.replace("\"", "")))
         code.putln("    sizeof(%s)," % objstruct)
         code.putln("    0,")
-        code.putln("    %s," % TypeSlots.get_slot_by_name("tp_flags").spec_slot_value(scope))
-        code.putln("    %s_slots," % type.typeobj_cname)
+        code.putln("    %s," % flags)
+        code.putln("    %s_slots," % typeobj_cname)
         code.putln("};")
 
     def generate_typeobj_definition(self, modname, entry, code):
