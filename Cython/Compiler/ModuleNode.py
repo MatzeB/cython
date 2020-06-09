@@ -1407,10 +1407,6 @@ class ModuleNode(Nodes.Node, Nodes.BlockNode):
             code.putln("#endif")
         else:
             code.putln("PyObject *o;")
-            code.putln("#if CYTHON_COMPILING_IN_LIMITED_API")
-            code.putln("allocfunc alloc_func = (allocfunc)PyType_GetSlot(t, Py_tp_alloc);")
-            code.putln("o = alloc_func(t, 0);")
-            code.putln("#else")
             if freelist_size:
                 code.globalstate.use_utility_code(
                     UtilityCode.load_cached("IncludeStringH", "StringTools.c"))
@@ -1431,16 +1427,24 @@ class ModuleNode(Nodes.Node, Nodes.BlockNode):
                 code.putln("} else {")
             if not is_final_type:
                 code.putln("if (likely((__Pyx_PyType_GetFlags(t) & Py_TPFLAGS_IS_ABSTRACT) == 0)) {")
+            code.putln("#if CYTHON_USE_TYPE_SLOTS")
             code.putln("o = (*t->tp_alloc)(t, 0);")
+            code.putln("#else")
+            code.putln("o = PyType_GenericNew(t, NULL, NULL);")
+            code.putln("#endif")
             if not is_final_type:
                 code.putln("} else {")
-                code.putln("o = (PyObject *) PyBaseObject_Type.tp_new(t, %s, 0);" % Naming.empty_tuple)
+                code.putln("#if CYTHON_COMPILING_IN_LIMITED_API")
+                code.putln("o = ((newfunc)PyType_GetSlot(t, Py_tp_new))(t, %s, 0);" %
+                           Naming.empty_tuple)
+                code.putln("#else")
+                code.putln("o = (PyObject *)PyBaseObject_Type.tp_new(t, %s, 0);" %
+                           Naming.empty_tuple)
+                code.putln("#endif")
                 code.putln("}")
         code.putln("if (unlikely(!o)) return 0;")
         if freelist_size and not base_type:
             code.putln('}')
-        if not base_type:
-            code.putln("#endif")
         if need_self_cast:
             code.putln("p = %s;" % type.cast_code("o"))
         #if need_self_cast:
