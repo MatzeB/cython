@@ -521,11 +521,17 @@ static PyObject *__Pyx_CoroutineAwait_Throw(__pyx_CoroutineAwaitObject *self, Py
 //////////////////// Generator.proto ////////////////////
 
 #define __Pyx_Generator_USED
+
+#if CYTHON_COMPILING_IN_LIMITED_API
+static int __pyx_Generator_init(void); /*proto*/
+#else
 static PyTypeObject *__pyx_GeneratorType = 0;
-#define __Pyx_Generator_CheckExact(obj) (Py_TYPE(obj) == __pyx_GeneratorType)
+#endif
+
+#define __Pyx_Generator_CheckExact(obj) (Py_TYPE(obj) == (PyTypeObject*)__pyx_GeneratorType)
 
 #define __Pyx_Generator_New(body, code, closure, name, qualname, module_name)  \
-    __Pyx__Coroutine_New(__pyx_GeneratorType, body, code, closure, name, qualname, module_name)
+    __Pyx__Coroutine_New((PyTypeObject*)__pyx_GeneratorType, body, code, closure, name, qualname, module_name)
 
 static PyObject *__Pyx_Generator_Next(PyObject *self);
 static int __pyx_Generator_init(void); /*proto*/
@@ -549,9 +555,23 @@ static int __pyx_Generator_init(void); /*proto*/
 //@requires: CommonStructures.c::FetchCommonType
 //@requires: CommonStructures.c::PyMemberDef
 
+#if !CYTHON_COMPILING_IN_LIMITED_API
 #include <frameobject.h>
+#endif
 
 #define __Pyx_Coroutine_Undelegate(gen) Py_CLEAR((gen)->yieldfrom)
+
+// Returns owned reference to ev->value. ev must be an exact StopIteration
+// instance.
+static PyObject *__Pyx_PyGen__GetStopIterationValue(PyObject *ev) {
+#if CYTHON_COMPILING_IN_LIMITED_API
+    return __Pyx_PyObject_GetAttrStr(ev, PYIDENT("value"));
+#else
+    PyObject *value = ((PyStopIterationObject *)ev)->value;
+    Py_INCREF(value);
+    return value;
+#endif
+}
 
 //   If StopIteration exception is set, fetches its 'value'
 //   attribute if any, otherwise sets pvalue to None.
@@ -581,8 +601,7 @@ static int __Pyx_PyGen__FetchStopIterationValue(CYTHON_UNUSED PyThreadState *$lo
         }
 #if PY_VERSION_HEX >= 0x030300A0
         else if (Py_TYPE(ev) == (PyTypeObject*)PyExc_StopIteration) {
-            value = ((PyStopIterationObject *)ev)->value;
-            Py_INCREF(value);
+            value = __Pyx_PyGen__GetStopIterationValue(ev);
             Py_DECREF(ev);
         }
 #endif
@@ -627,8 +646,7 @@ static int __Pyx_PyGen__FetchStopIterationValue(CYTHON_UNUSED PyThreadState *$lo
     Py_XDECREF(tb);
     Py_DECREF(et);
 #if PY_VERSION_HEX >= 0x030300A0
-    value = ((PyStopIterationObject *)ev)->value;
-    Py_INCREF(value);
+    value = __Pyx_PyGen__GetStopIterationValue(ev);
     Py_DECREF(ev);
 #else
     {
@@ -765,7 +783,7 @@ PyObject *__Pyx_Coroutine_SendEx(__pyx_CoroutineObject *self, PyObject *value, i
 
     exc_state = &self->gi_exc_state;
     if (exc_state->exc_type) {
-        #if CYTHON_COMPILING_IN_PYPY || CYTHON_COMPILING_IN_PYSTON
+        #if CYTHON_COMPILING_IN_PYPY || CYTHON_COMPILING_IN_PYSTON || CYTHON_COMPILING_IN_LIMITED_API
         // FIXME: what to do in PyPy?
         #else
         // Generators always return to their most recent caller, not
@@ -821,7 +839,7 @@ static CYTHON_INLINE void __Pyx_Coroutine_ResetFrameBackpointer(__Pyx_ExcInfoStr
     PyObject *exc_tb = exc_state->exc_traceback;
 
     if (likely(exc_tb)) {
-#if CYTHON_COMPILING_IN_PYPY || CYTHON_COMPILING_IN_PYSTON
+#if CYTHON_COMPILING_IN_PYPY || CYTHON_COMPILING_IN_PYSTON || CYTHON_COMPILING_IN_LIMITED_API
     // FIXME: what to do in PyPy?
 #else
         PyTracebackObject *tb = (PyTracebackObject *) exc_tb;
@@ -901,7 +919,11 @@ static PyObject *__Pyx_Coroutine_Send(PyObject *self, PyObject *value) {
         #endif
         {
             if (value == Py_None)
+                #if CYTHON_USE_TYPE_SLOTS
                 ret = Py_TYPE(yf)->tp_iternext(yf);
+                #else
+                ret = PyIter_Next(yf);
+                #endif
             else
                 ret = __Pyx_PyObject_CallMethod1(yf, PYIDENT("send"), value);
         }
@@ -999,7 +1021,11 @@ static PyObject *__Pyx_Generator_Next(PyObject *self) {
             ret = __Pyx_Coroutine_Send(yf, Py_None);
         } else
         #endif
+        #if CYTHON_USE_TYPE_SLOTS
             ret = Py_TYPE(yf)->tp_iternext(yf);
+        #else
+            ret = PyIter_Next(yf);
+        #endif
         gen->is_running = 0;
         //Py_DECREF(yf);
         if (likely(ret)) {
@@ -1187,10 +1213,20 @@ static void __Pyx_Coroutine_dealloc(PyObject *self) {
     if (gen->resume_label >= 0) {
         // Generator is paused or unstarted, so we need to close
         PyObject_GC_Track(self);
-#if PY_VERSION_HEX >= 0x030400a1 && CYTHON_USE_TP_FINALIZE
+#if PY_VERSION_HEX >= 0x030400a1 && CYTHON_USE_TP_FINALIZE && !CYTHON_COMPILING_IN_LIMITED_API
         if (PyObject_CallFinalizerFromDealloc(self))
 #else
+        #if CYTHON_COMPILING_IN_LIMITED_API
+        // Equivalent to Py_TYPE(gen)->tp_finalize(self)
+        #if CYTHON_USE_TP_FINALIZE
+        ((destructor)PyType_GetSlot(Py_TYPE(gen), Py_tp_finalize))(self);
+        #else
+        // Equivalent to Py_TYPE(gen)->tp_del(self)
+        ((destructor)PyType_GetSlot(Py_TYPE(gen), Py_tp_del))(self);
+        #endif  // CYTHON_USE_TP_FINALIZE
+        #else
         Py_TYPE(gen)->tp_del(self);
+        #endif  // CYTHON_COMPILING_IN_LIMITED_API
         if (self->ob_refcnt > 0)
 #endif
         {
@@ -1266,7 +1302,7 @@ static void __Pyx_Coroutine_del(PyObject *self) {
 #else
         {PyObject *msg;
         char *cmsg;
-        #if CYTHON_COMPILING_IN_PYPY
+        #if CYTHON_COMPILING_IN_PYPY || CYTHON_COMPILING_IN_LIMITED_API
         msg = NULL;
         cmsg = (char*) "coroutine was never awaited";
         #else
@@ -1403,6 +1439,7 @@ __Pyx_Coroutine_set_qualname(__pyx_CoroutineObject *self, PyObject *value, CYTHO
     return 0;
 }
 
+#if !CYTHON_COMPILING_IN_LIMITED_API
 static PyObject *
 __Pyx_Coroutine_get_frame(__pyx_CoroutineObject *self, CYTHON_UNUSED void *context)
 {
@@ -1426,6 +1463,7 @@ __Pyx_Coroutine_get_frame(__pyx_CoroutineObject *self, CYTHON_UNUSED void *conte
     Py_INCREF(frame);
     return frame;
 }
+#endif
 
 static __pyx_CoroutineObject *__Pyx__Coroutine_New(
             PyTypeObject* type, __pyx_coroutine_body_t body, PyObject *code, PyObject *closure,
@@ -1659,8 +1697,10 @@ static PyGetSetDef __pyx_Coroutine_getsets[] = {
      (char*) PyDoc_STR("name of the coroutine"), 0},
     {(char *) "__qualname__", (getter)__Pyx_Coroutine_get_qualname, (setter)__Pyx_Coroutine_set_qualname,
      (char*) PyDoc_STR("qualified name of the coroutine"), 0},
+#if !CYTHON_COMPILING_IN_LIMITED_API
     {(char *) "cr_frame", (getter)__Pyx_Coroutine_get_frame, NULL,
      (char*) PyDoc_STR("Frame of the coroutine"), 0},
+#endif
     {0, 0, 0, 0, 0}
 };
 
@@ -1884,6 +1924,7 @@ static PyMethodDef __pyx_Generator_methods[] = {
 };
 
 static PyMemberDef __pyx_Generator_memberlist[] = {
+    {(char *) "__weaklistoffset__", T_PYSSIZET, offsetof(__pyx_CoroutineObject, gi_weakreflist), READONLY, 0},
     {(char *) "gi_running", T_BOOL, offsetof(__pyx_CoroutineObject, is_running), READONLY, NULL},
     {(char*) "gi_yieldfrom", T_OBJECT, offsetof(__pyx_CoroutineObject, yieldfrom), READONLY,
      (char*) PyDoc_STR("object being iterated by 'yield from', or None")},
@@ -1896,11 +1937,49 @@ static PyGetSetDef __pyx_Generator_getsets[] = {
      (char*) PyDoc_STR("name of the generator"), 0},
     {(char *) "__qualname__", (getter)__Pyx_Coroutine_get_qualname, (setter)__Pyx_Coroutine_set_qualname,
      (char*) PyDoc_STR("qualified name of the generator"), 0},
+#if !CYTHON_COMPILING_IN_LIMITED_API
     {(char *) "gi_frame", (getter)__Pyx_Coroutine_get_frame, NULL,
      (char*) PyDoc_STR("Frame of the coroutine"), 0},
+#endif
     {0, 0, 0, 0, 0}
 };
 
+#if CYTHON_COMPILING_IN_LIMITED_API
+static PyType_Slot __pyx_GeneratorType_slots[] = {
+  {Py_tp_dealloc, (void *)__Pyx_Coroutine_dealloc},
+  {Py_tp_getattro, (void *)__Pyx_PyObject_GenericGetAttrNoDict},
+  {Py_tp_getset, (void *)__pyx_Generator_getsets},
+  {Py_tp_iter, (void *)PyObject_SelfIter},
+  {Py_tp_iternext, (void *)__Pyx_Generator_Next},
+  {Py_tp_members, (void *)__pyx_Generator_memberlist},
+  {Py_tp_methods, (void *)__pyx_Generator_methods},
+  {Py_tp_traverse, (void *)__Pyx_Coroutine_traverse},
+#if CYTHON_USE_TP_FINALIZE
+  {Py_tp_finalize, (void *)__Pyx_Coroutine_del},
+#else
+  {Py_tp_del, (void *)__Pyx_Coroutine_del},
+#endif
+  {0, 0},
+};
+
+static PyType_Spec __pyx_GeneratorType_spec = {
+    "generator",
+    sizeof(__pyx_CoroutineObject),
+    0,
+    Py_TPFLAGS_DEFAULT | Py_TPFLAGS_HAVE_GC | Py_TPFLAGS_HAVE_FINALIZE,
+    __pyx_GeneratorType_slots,
+};
+
+static int __pyx_Generator_init(void) {
+    __pyx_GeneratorType = __Pyx_FetchCommonTypeFromSpec(&__pyx_GeneratorType_spec, NULL);
+    if (unlikely(!__pyx_GeneratorType)) {
+        return -1;
+    }
+    return 0;
+}
+#endif
+
+#if !CYTHON_COMPILING_IN_LIMITED_API
 static PyTypeObject __pyx_GeneratorType_type = {
     PyVarObject_HEAD_INIT(0, 0)
     "generator",                        /*tp_name*/
@@ -1977,6 +2056,7 @@ static int __pyx_Generator_init(void) {
     }
     return 0;
 }
+#endif
 
 
 /////////////// ReturnWithStopIteration.proto ///////////////
@@ -2046,6 +2126,7 @@ static PyObject* __Pyx_Coroutine_patch_module(PyObject* module, const char* py_c
 
 //////////////////// PatchModuleWithCoroutine ////////////////////
 //@substitute: naming
+//@requires: Builtins.c::PyRun_String
 
 static PyObject* __Pyx_Coroutine_patch_module(PyObject* module, const char* py_code) {
 #if defined(__Pyx_Generator_USED) || defined(__Pyx_Coroutine_USED)
@@ -2068,7 +2149,7 @@ static PyObject* __Pyx_Coroutine_patch_module(PyObject* module, const char* py_c
     if (unlikely(result < 0)) goto ignore;
     if (unlikely(PyDict_SetItemString(globals, "_module", module) < 0)) goto ignore;
     if (unlikely(PyDict_SetItemString(globals, "__builtins__", $builtins_cname) < 0)) goto ignore;
-    result_obj = PyRun_String(py_code, Py_file_input, globals, globals);
+    result_obj = __Pyx_PyRun_String(py_code, Py_file_input, globals, globals);
     if (unlikely(!result_obj)) goto ignore;
     Py_DECREF(result_obj);
     Py_DECREF(globals);

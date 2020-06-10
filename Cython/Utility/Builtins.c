@@ -31,6 +31,20 @@ static PyObject* __Pyx_Globals(void) {
     return globals;
 }
 
+//////////////////// PyRun_String ////////////////////
+
+#if CYTHON_COMPILING_IN_LIMITED_API
+static PyObject* __Pyx_PyRun_String(const char* code, int start, PyObject* globals, PyObject* locals) {
+  PyObject* compiled = Py_CompileString(code, "<string>", start);
+  if (compiled == NULL) {
+    return NULL;
+  }
+  return PyEval_EvalCode(compiled, globals, locals);
+}
+#else
+#define __Pyx_PyRun_String PyRun_String
+#endif
+
 //////////////////// PyExecGlobals.proto ////////////////////
 
 static PyObject* __Pyx_PyExecGlobals(PyObject*);

@@ -1408,6 +1408,7 @@ class ModuleNode(Nodes.Node, Nodes.BlockNode):
         else:
             code.putln("PyObject *o;")
             if freelist_size:
+                code.putln("int use_freelist = 0;")
                 code.globalstate.use_utility_code(
                     UtilityCode.load_cached("IncludeStringH", "StringTools.c"))
                 if is_final_type:
@@ -1415,9 +1416,12 @@ class ModuleNode(Nodes.Node, Nodes.BlockNode):
                 else:
                     type_safety_check = ' & ((__Pyx_PyType_GetFlags(t) & (Py_TPFLAGS_IS_ABSTRACT | Py_TPFLAGS_HEAPTYPE)) == 0)'
                 obj_struct = type.declaration_code("", deref=True)
+                code.putln("#if CYTHON_COMPILING_IN_CPYTHON")
+                code.putln("use_freelist = (%s > 0) & (t->tp_basicsize == sizeof(%s))%s;" %
+                        (freecount_name, obj_struct, type_safety_check))
+                code.putln("#endif")
                 code.putln(
-                    "if (CYTHON_COMPILING_IN_CPYTHON && likely((%s > 0) & (t->tp_basicsize == sizeof(%s))%s)) {" % (
-                        freecount_name, obj_struct, type_safety_check))
+                    "if (use_freelist) {")
                 code.putln("o = (PyObject*)%s[--%s];" % (
                     freelist_name, freecount_name))
                 code.putln("memset(o, 0, sizeof(%s));" % obj_struct)
@@ -1636,12 +1640,16 @@ class ModuleNode(Nodes.Node, Nodes.BlockNode):
                         ' & ((__Pyx_PyType_GetFlags(Py_TYPE(o)) & (Py_TPFLAGS_IS_ABSTRACT | Py_TPFLAGS_HEAPTYPE)) == 0)')
 
                 type = scope.parent_type
+                code.putln("int use_freelist = 0;")
+                code.putln("#if CYTHON_COMPILING_IN_CPYTHON && !CYTHON_COMPILING_IN_LIMITED_API")
                 code.putln(
-                    "if (CYTHON_COMPILING_IN_CPYTHON && ((%s < %d) & (Py_TYPE(o)->tp_basicsize == sizeof(%s))%s)) {" % (
+                    "use_freelist = (%s < %d) & (Py_TYPE(o)->tp_basicsize == sizeof(%s))%s;" % (
                         freecount_name,
                         freelist_size,
                         type.declaration_code("", deref=True),
                         type_safety_check))
+                code.putln("#endif")
+                code.putln("if (use_freelist) {")
                 code.putln("%s[%s++] = %s;" % (
                     freelist_name, freecount_name, type.cast_code("o")))
                 code.putln("} else {")
