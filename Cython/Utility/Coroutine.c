@@ -496,17 +496,24 @@ static CYTHON_INLINE void __Pyx_Coroutine_ResetFrameBackpointer(__Pyx_ExcInfoStr
 //////////////////// Coroutine.proto ////////////////////
 
 #define __Pyx_Coroutine_USED
+#define __Pyx_CoroutineAwait_USED
+#if CYTHON_COMPILING_IN_LIMITED_API
+static int __pyx_Coroutine_init(void); /*proto*/
+static int __pyx_CoroutineAwait_init(void); /*proto*/
+#else
 static PyTypeObject *__pyx_CoroutineType = 0;
 static PyTypeObject *__pyx_CoroutineAwaitType = 0;
-#define __Pyx_Coroutine_CheckExact(obj) (Py_TYPE(obj) == __pyx_CoroutineType)
+#endif
+#define __Pyx_Coroutine_CheckExact(obj) (Py_TYPE(obj) == (PyTypeObject *)__pyx_CoroutineType)
 // __Pyx_Coroutine_Check(obj): see override for IterableCoroutine below
 #define __Pyx_Coroutine_Check(obj) __Pyx_Coroutine_CheckExact(obj)
-#define __Pyx_CoroutineAwait_CheckExact(obj) (Py_TYPE(obj) == __pyx_CoroutineAwaitType)
+#define __Pyx_CoroutineAwait_CheckExact(obj) (Py_TYPE(obj) == (PyTypeObject *)__pyx_CoroutineAwaitType)
 
 #define __Pyx_Coroutine_New(body, code, closure, name, qualname, module_name)  \
-    __Pyx__Coroutine_New(__pyx_CoroutineType, body, code, closure, name, qualname, module_name)
+    __Pyx__Coroutine_New((PyTypeObject *)__pyx_CoroutineType, body, code, closure, name, qualname, module_name)
 
 static int __pyx_Coroutine_init(void); /*proto*/
+static int __pyx_CoroutineAwait_init(void); /*proto*/
 static PyObject *__Pyx__Coroutine_await(PyObject *coroutine); /*proto*/
 
 typedef struct {
@@ -1565,6 +1572,37 @@ static PyMethodDef __pyx_CoroutineAwait_methods[] = {
     {0, 0, 0, 0}
 };
 
+#if CYTHON_COMPILING_IN_LIMITED_API
+static PyType_Slot __pyx_CoroutineAwaitType_slots[] = {
+  {Py_tp_clear, (void *)__Pyx_CoroutineAwait_clear},
+  {Py_tp_dealloc, (void *)__Pyx_CoroutineAwait_dealloc},
+  {Py_tp_doc, (void *)PyDoc_STR("A wrapper object implementing __await__ for coroutines.")},
+  {Py_tp_iter, (void *)__Pyx_CoroutineAwait_self},
+  {Py_tp_iternext, (void *)__Pyx_CoroutineAwait_Next},
+  {Py_tp_methods, (void *)__pyx_CoroutineAwait_methods},
+  {Py_tp_traverse, (void *)__Pyx_CoroutineAwait_traverse},
+#if !CYTHON_COMPILING_IN_PYPY
+  {Py_tp_new, (void *)__Pyx_CoroutineAwait_no_new},
+#endif
+  {0, 0},
+};
+
+static PyType_Spec __pyx_CoroutineAwaitType_spec = {
+    "coroutine_wrapper",
+    sizeof(__pyx_CoroutineAwaitObject),
+    0,
+    Py_TPFLAGS_DEFAULT | Py_TPFLAGS_HAVE_GC,
+    __pyx_CoroutineAwaitType_slots,
+};
+
+static int __pyx_CoroutineAwait_init(void) {
+    __pyx_CoroutineAwaitType =
+        __Pyx_FetchCommonTypeFromSpec(&__pyx_CoroutineAwaitType_spec, NULL);
+    return (unlikely(__pyx_CoroutineAwaitType == NULL)) ? -1 : 0;
+}
+#endif
+
+#if !CYTHON_COMPILING_IN_LIMITED_API
 static PyTypeObject __pyx_CoroutineAwaitType_type = {
     PyVarObject_HEAD_INIT(0, 0)
     "coroutine_wrapper",                /*tp_name*/
@@ -1628,9 +1666,17 @@ static PyTypeObject __pyx_CoroutineAwaitType_type = {
 #endif
 };
 
-#if PY_VERSION_HEX < 0x030500B1 || defined(__Pyx_IterableCoroutine_USED) || CYTHON_USE_ASYNC_SLOTS
+static int __pyx_CoroutineAwait_init(void) {
+    __pyx_CoroutineAwaitType = __Pyx_FetchCommonType(&__pyx_CoroutineAwaitType_type);
+    return (unlikely(__pyx_CoroutineAwaitType == NULL)) ? -1 : 0;
+}
+#endif
+
+#if PY_VERSION_HEX < 0x030500B1 || defined(__Pyx_IterableCoroutine_USED) ||    \
+    CYTHON_USE_ASYNC_SLOTS || CYTHON_COMPILING_IN_LIMITED_API
 static CYTHON_INLINE PyObject *__Pyx__Coroutine_await(PyObject *coroutine) {
-    __pyx_CoroutineAwaitObject *await = PyObject_GC_New(__pyx_CoroutineAwaitObject, __pyx_CoroutineAwaitType);
+    __pyx_CoroutineAwaitObject *await = PyObject_GC_New(
+        __pyx_CoroutineAwaitObject, (PyTypeObject *)__pyx_CoroutineAwaitType);
     if (unlikely(!await)) return NULL;
     Py_INCREF(coroutine);
     await->coroutine = coroutine;
@@ -1639,7 +1685,7 @@ static CYTHON_INLINE PyObject *__Pyx__Coroutine_await(PyObject *coroutine) {
 }
 #endif
 
-#if PY_VERSION_HEX < 0x030500B1
+#if PY_VERSION_HEX < 0x030500B1 || CYTHON_COMPILING_IN_LIMITED_API
 static PyObject *__Pyx_Coroutine_await_method(PyObject *coroutine, CYTHON_UNUSED PyObject *arg) {
     return __Pyx__Coroutine_await(coroutine);
 }
@@ -1676,7 +1722,7 @@ static PyMethodDef __pyx_Coroutine_methods[] = {
      (char*) PyDoc_STR("throw(typ[,val[,tb]]) -> raise exception in coroutine,\nreturn next iterated value or raise StopIteration.")},
     {"close", (PyCFunction) __Pyx_Coroutine_Close_Method, METH_NOARGS,
      (char*) PyDoc_STR("close() -> raise GeneratorExit inside coroutine.")},
-#if PY_VERSION_HEX < 0x030500B1
+#if PY_VERSION_HEX < 0x030500B1 || CYTHON_COMPILING_IN_LIMITED_API
     {"__await__", (PyCFunction) __Pyx_Coroutine_await_method, METH_NOARGS,
      (char*) PyDoc_STR("__await__() -> return an iterator to be used in await expression.")},
 #endif
@@ -1684,6 +1730,9 @@ static PyMethodDef __pyx_Coroutine_methods[] = {
 };
 
 static PyMemberDef __pyx_Coroutine_memberlist[] = {
+#if CYTHON_COMPILING_IN_LIMITED_API
+    {(char *) "__weaklistoffset__", T_PYSSIZET, offsetof(__pyx_CoroutineObject, gi_weakreflist), READONLY, 0},
+#endif
     {(char *) "cr_running", T_BOOL, offsetof(__pyx_CoroutineObject, is_running), READONLY, NULL},
     {(char*) "cr_await", T_OBJECT, offsetof(__pyx_CoroutineObject, yieldfrom), READONLY,
      (char*) PyDoc_STR("object being awaited, or None")},
@@ -1712,6 +1761,44 @@ static __Pyx_PyAsyncMethodsStruct __pyx_Coroutine_as_async = {
 };
 #endif
 
+#if CYTHON_COMPILING_IN_LIMITED_API
+static PyType_Slot __pyx_CoroutineType_slots[] = {
+  {Py_tp_dealloc, (void *)__Pyx_Coroutine_dealloc},
+  {Py_tp_getattro, (void *)__Pyx_PyObject_GenericGetAttrNoDict},
+  {Py_tp_getset, (void *)__pyx_Coroutine_getsets},
+  {Py_tp_methods, (void *)__pyx_Coroutine_methods},
+  {Py_tp_members, (void *)__pyx_Coroutine_memberlist},
+  {Py_tp_traverse, (void *)__Pyx_Coroutine_traverse},
+#if CYTHON_USE_TP_FINALIZE
+  {Py_tp_finalize, (void *)__Pyx_Coroutine_del},
+#else
+  {Py_tp_del, (void *)__Pyx_Coroutine_del},
+#endif
+  {0, 0},
+};
+
+static PyType_Spec __pyx_CoroutineType_spec = {
+    "coroutine",
+    sizeof(__pyx_CoroutineObject),
+    0,
+    Py_TPFLAGS_DEFAULT | Py_TPFLAGS_HAVE_GC | Py_TPFLAGS_HAVE_FINALIZE,
+    __pyx_CoroutineType_slots,
+};
+
+static int __pyx_Coroutine_init(void) {
+    __pyx_CoroutineType = __Pyx_FetchCommonTypeFromSpec(&__pyx_CoroutineType_spec, NULL);
+    if (unlikely(!__pyx_CoroutineType))
+        return -1;
+
+#ifdef __Pyx_IterableCoroutine_USED
+    if (unlikely(__pyx_IterableCoroutine_init() == -1))
+        return -1;
+#endif
+    return 0;
+}
+#endif
+
+#if !CYTHON_COMPILING_IN_LIMITED_API
 static PyTypeObject __pyx_CoroutineType_type = {
     PyVarObject_HEAD_INIT(0, 0)
     "coroutine",                        /*tp_name*/
@@ -1798,12 +1885,9 @@ static int __pyx_Coroutine_init(void) {
     if (unlikely(__pyx_IterableCoroutine_init() == -1))
         return -1;
 #endif
-
-    __pyx_CoroutineAwaitType = __Pyx_FetchCommonType(&__pyx_CoroutineAwaitType_type);
-    if (unlikely(!__pyx_CoroutineAwaitType))
-        return -1;
     return 0;
 }
+#endif
 
 
 //////////////////// IterableCoroutine.proto ////////////////////

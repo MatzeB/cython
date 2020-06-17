@@ -39,6 +39,7 @@ extension_types = (
     'AsyncGen',
     'BoundMethod',
     'Coroutine',
+    'CoroutineAwait',
     'CyFunction',
     'FusedFunction',
     'Generator',

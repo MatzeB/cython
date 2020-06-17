@@ -139,6 +139,7 @@ extension_types = {
     "AsyncGen": pyrex_prefix + "AsyncGenType",
     "BoundMethod": pyrex_prefix + "BoundMethodType",
     "Coroutine": pyrex_prefix + "CoroutineType",
+    "CoroutineAwait": pyrex_prefix + "CoroutineAwaitType",
     "CyFunction": pyrex_prefix + "CyFunctionType",
     "FusedFunction": pyrex_prefix + "FusedFunctionType",
     "Generator": pyrex_prefix + "GeneratorType",
