@@ -2287,6 +2287,18 @@ class NameNode(AtomicExprNode):
                 rhs.py_result()))
         code.putln("#endif")
 
+    def generate_type_assignment_code(self, rhs, code):
+        namespace = self.entry.scope.namespace_cname
+        code.putln("#if CYTHON_COMPILING_IN_LIMITED_API")
+        # TODO(T68447280): Figure out a more precise way to put something into
+        # a type's dict in a PEP-384 compliant way
+        self.generate_generic_assignment_code(rhs, code, 'PyObject_SetAttr', namespace)
+        code.putln("#else")
+        # if the entry is a member we have to cheat: SetAttr does not work
+        # on types, so we create a descriptor which is then added to tp_dict
+        self.generate_generic_assignment_code(rhs, code, 'PyDict_SetItem', '%s->tp_dict' % namespace)
+        code.putln("#endif")
+
     def generate_generic_assignment_code(self, rhs, code, setter, namespace):
         interned_cname = code.intern_identifier(self.entry.name)
         code.put_error_if_neg(
@@ -2314,12 +2326,7 @@ class NameNode(AtomicExprNode):
         if entry.is_pyglobal:
             assert entry.type.is_pyobject, "Python global or builtin not a Python object"
             if entry.is_member:
-                # if the entry is a member we have to cheat: SetAttr does not work
-                # on types, so we create a descriptor which is then added to tp_dict
-                setter = 'PyDict_SetItem'
-                namespace = '%s->tp_dict' % self.entry.scope.namespace_cname
-                self.generate_generic_assignment_code(rhs, code, setter,
-                                                      namespace)
+                self.generate_type_assignment_code(rhs, code)
             elif entry.scope.is_module_scope:
                 self.generate_module_assignment_code(rhs, code)
             elif entry.is_pyclass_attr:
